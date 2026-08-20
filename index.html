@@ -219,7 +219,7 @@
     <div id="joystick-zone"></div>
     <button id="fire-button">FIRE</button>
 
-    <script src="https://unpkg.com/nipplejs@0.10.2/dist/nipplejs.min.js"></script>
+    <script src="https://unpkg.com/nipplejs@0.10.2/dist/nipplejs.js"></script>
     <script>
     (function() {
         'use strict';
@@ -1184,6 +1184,19 @@
 
             requestAnimationFrame(gameLoop);
         }
+
+        // --- Fullscreen ---
+        function requestFullscreen() {
+            const el = document.documentElement;
+            const rfs = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+            if (rfs && !document.fullscreenElement && !document.webkitFullscreenElement) {
+                rfs.call(el).catch(() => {});
+            }
+        }
+        document.addEventListener('touchstart', function goFull() {
+            requestFullscreen();
+            document.removeEventListener('touchstart', goFull);
+        }, { once: true });
 
         // --- Start ---
         try { detectMobile(); } catch(e) { console.warn('Mobile init failed:', e); }
