@@ -348,11 +348,13 @@
             upgrades: { hull: 0, fuel: 0, cargo: 0, speed: 0, fireRate: 0, thrust: 0, scanner: 0, density: 0 },
             derived: { maxSpeed: SHIP_MAX_SPEED, fireRate: FIRE_RATE_BASE, accel: SHIP_ACCEL },
             settings: { joystickSide: 'left', joystickMode: 'static' },
-            docked: true,
+            docked: false,
             cargoFullFlash: 0,
             stranded: false,
             rescued: false,
-            rescueTug: null
+            rescueTug: null,
+            fuelWarnFlash: 0,
+            fuelWarnMsg: ''
         };
 
         function applyUpgrades() {
@@ -525,6 +527,8 @@
             ship.hull = ship.maxHull;
             ship.invulnTimer = 0;
             ship.vx = 0; ship.vy = 0;
+            spawnParticles(ship.x, ship.y, 15, '#58a6ff', 100);
+            spawnParticles(ship.x, ship.y, 10, '#3fb950', 80);
             document.getElementById('dock-button').classList.remove('visible');
             openShop();
         });
@@ -855,8 +859,15 @@
             }
 
             if (ship.thrust > 0 && ship.fuel > 0) {
+                const prevPct = ship.fuel / ship.maxFuel;
                 ship.fuel -= FUEL_DRAIN_RATE * ship.thrust * dt;
                 if (ship.fuel < 0) ship.fuel = 0;
+                const newPct = ship.fuel / ship.maxFuel;
+                if (prevPct > 0.5 && newPct <= 0.5) {
+                    gameState.fuelWarnFlash = 2; gameState.fuelWarnMsg = 'HALF FUEL';
+                } else if (prevPct > 0.2 && newPct <= 0.2) {
+                    gameState.fuelWarnFlash = 2.5; gameState.fuelWarnMsg = 'LOW FUEL';
+                }
                 ship.vx += Math.cos(ship.angle) * derived.accel * ship.thrust * dt;
                 ship.vy += Math.sin(ship.angle) * derived.accel * ship.thrust * dt;
                 if (gameState.particles.length < PARTICLE_MAX && Math.random() < 0.6) {
@@ -895,6 +906,7 @@
 
             if (ship.invulnTimer > 0) ship.invulnTimer -= dt;
             if (gameState.cargoFullFlash > 0) gameState.cargoFullFlash -= dt;
+            if (gameState.fuelWarnFlash > 0) gameState.fuelWarnFlash -= dt;
         }
 
         function updateShooting(dt) {
@@ -1305,7 +1317,7 @@
 
             ctx.fillStyle = '#484f58';
             ctx.textAlign = 'right';
-            ctx.fillText('v0.6', canvas.width - 14, 24);
+            ctx.fillText('v0.7', canvas.width - 14, 24);
             ctx.textAlign = 'left';
 
             ctx.fillStyle = '#8b949e';
@@ -1330,6 +1342,16 @@
                 ctx.font = '16px Courier New';
                 ctx.textAlign = 'center';
                 ctx.fillText('CARGO FULL', canvas.width / 2, canvas.height - 40);
+            }
+
+            if (gameState.fuelWarnFlash > 0) {
+                const alpha = Math.min(1, gameState.fuelWarnFlash);
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = gameState.fuelWarnMsg === 'LOW FUEL' ? '#f85149' : '#f0883e';
+                ctx.font = '18px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText(gameState.fuelWarnMsg, canvas.width / 2, canvas.height / 2 - 60);
+                ctx.globalAlpha = 1;
             }
 
             // Home indicator
