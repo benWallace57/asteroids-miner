@@ -238,7 +238,8 @@
             </div>
         </div>
         <button class="btn" id="resume-btn">Resume</button>
-        <button class="btn" id="transmissions-btn" style="margin-top:20px;border-color:#3fb950;color:#3fb950;font-size:0.7rem">TRANSMISSIONS</button>
+        <div id="pause-stats" style="margin-top:16px;text-align:left;font:10px Courier New;color:#6e7681;line-height:1.6"></div>
+        <button class="btn" id="transmissions-btn" style="margin-top:12px;border-color:#3fb950;color:#3fb950;font-size:0.7rem">TRANSMISSIONS</button>
         <button class="btn" id="cheat-btn" style="margin-top:8px;border-color:#3fb950;color:#3fb950;font-size:0.7rem">$$$ CHEAT $$$</button>
         <button class="btn" id="reset-btn" style="margin-top:8px;border-color:#f85149;color:#f85149;font-size:0.7rem">RESET SAVE</button>
     </div>
@@ -315,7 +316,12 @@
         const BASE_DOCK_RADIUS = 60;
         const BASE_DOCK_SPEED = 40;
         const BASE_SAFE_RADIUS = 300;
-        const UPGRADE_COSTS = [10, 30, 75, 150, 300];
+        const UPGRADE_COSTS = {
+            basic: [10, 25, 60, 120, 250],
+            mid:   [15, 40, 90, 180, 350],
+            high:  [25, 60, 140, 280, 500],
+            elite: [40, 100, 250, 500, 900]
+        };
         const STAR_COUNT = 200;
         const STAR_FIELD_SIZE = 2000;
         const PARTICLE_MAX = 120;
@@ -327,32 +333,39 @@
         };
 
         const RESOURCE_TYPES = [
-            { name: 'iron',     color: '#8b949e', minDist: 0,    value: 2 },
-            { name: 'copper',   color: '#f0883e', minDist: 500,  value: 5 },
-            { name: 'gold',     color: '#d2a8ff', minDist: 1500, value: 12 },
-            { name: 'platinum', color: '#58a6ff', minDist: 3000, value: 25 },
+            { name: 'iron',     color: '#6e7681', minDist: 0,    value: 2 },
+            { name: 'copper',   color: '#da6d28', minDist: 500,  value: 5 },
+            { name: 'gold',     color: '#f7d944', minDist: 1500, value: 12 },
+            { name: 'platinum', color: '#f0f3f6', minDist: 3000, value: 25 },
             { name: 'crystal',  color: '#3fb950', minDist: 5000, value: 60 },
             { name: 'scrap',    color: '#f85149', minDist: 99999, value: 8 }
         ];
 
         const UPGRADE_DEFS = [
-            { key: 'hull',        label: 'HULL',         desc: '+1 max HP' },
-            { key: 'fuel',        label: 'FUEL',         desc: '+25 tank' },
-            { key: 'cargo',       label: 'CARGO',        desc: '+4 slots' },
-            { key: 'speed',       label: 'SPEED',        desc: '+50 max', reqHull: 1 },
-            { key: 'fireRate',    label: 'GUN RATE',     desc: 'faster manual', reqHull: 1 },
-            { key: 'thrust',      label: 'THRUST',       desc: '+100 accel', reqHull: 1 },
-            { key: 'turretRate',  label: 'TURRET RATE',  desc: 'faster auto', reqHull: 1 },
-            { key: 'turretRange', label: 'TURRET RANGE', desc: '+100 range', reqHull: 2 },
-            { key: 'scanner',     label: 'SCANNER',      desc: 'better drops', reqHull: 2 },
-            { key: 'density',     label: 'DENSITY',      desc: 'more rocks', reqHull: 2 },
-            { key: 'magnet',      label: 'MAGNET',       desc: 'pull resources', reqHull: 3 },
-            { key: 'telesale',    label: 'TELESALE',     desc: 'auto-sell cheap', reqBase: 'sellBonus' }
+            { key: 'hull',        label: 'HULL',         desc: '+1 max HP', tier: 'basic' },
+            { key: 'fuel',        label: 'FUEL',         desc: '+25 tank', tier: 'basic' },
+            { key: 'cargo',       label: 'CARGO',        desc: '+4 slots', tier: 'basic' },
+            { key: 'speed',       label: 'SPEED',        desc: '+50 max', tier: 'mid', reqHull: 1 },
+            { key: 'fireRate',    label: 'GUN RATE',     desc: 'faster manual', tier: 'mid', reqHull: 1 },
+            { key: 'thrust',      label: 'THRUST',       desc: '+100 accel', tier: 'mid', reqHull: 1 },
+            { key: 'efficiency',  label: 'EFFICIENCY',   desc: '-15% fuel drain', tier: 'mid', reqHull: 1 },
+            { key: 'turretRate',  label: 'TURRET RATE',  desc: 'faster auto', tier: 'mid', reqHull: 1 },
+            { key: 'turretRange', label: 'TURRET RANGE', desc: '+100 range', tier: 'high', reqHull: 2 },
+            { key: 'scanner',     label: 'SCANNER',      desc: 'better drops', tier: 'high', reqHull: 2 },
+            { key: 'density',     label: 'DENSITY',      desc: 'more rocks', tier: 'high', reqHull: 2 },
+            { key: 'shield',      label: 'SHIELD',       desc: '+0.5s invuln', tier: 'high', reqHull: 2 },
+            { key: 'dash',        label: 'DASH',         desc: 'speed burst', tier: 'high', reqHull: 2 },
+            { key: 'magnet',      label: 'MAGNET',       desc: 'pull resources', tier: 'elite', reqHull: 3 },
+            { key: 'piercing',    label: 'PIERCING',     desc: 'bullets pass through', tier: 'elite', reqHull: 3 },
+            { key: 'salvage',     label: 'SALVAGE',      desc: '+1 enemy drops', tier: 'elite', reqHull: 3 },
+            { key: 'telesale',    label: 'TELESALE',     desc: 'auto-sell cheap', tier: 'elite', reqBase: 'sellBonus' }
         ];
 
         const BASE_UPGRADE_DEFS = [
             { key: 'sellBonus', label: 'TRADE HUB', desc: '+15% sell', costs: [50, 150, 400] },
-            { key: 'defense',   label: 'DEFENSE',   desc: 'auto-destroy + magnet', costs: [75, 200, 500] }
+            { key: 'defense',   label: 'DEFENSE',   desc: 'auto-destroy near base', costs: [75, 200, 500] },
+            { key: 'beacon',    label: 'BEACON',    desc: '+100 safe zone', costs: [100, 300, 600] },
+            { key: 'refinery',  label: 'REFINERY',  desc: '+20% platinum/crystal', costs: [150, 400, 800] }
         ];
 
         const TRANSMISSIONS = [
@@ -378,22 +391,92 @@
               from: 'ENCRYPTED SIGNAL', text: "They call it Project Hollow Core. The asteroids aren't natural. None of this is. Get out while you can." },
             { id: 'quest_complete_3', trigger: 'quest_complete', condition: s => s.questsCompleted >= 3,
               from: 'KOREX DIRECTOR VOSS', text: "You've exceeded expectations. Most miners don't last this long. We'd like to offer you... a promotion. Details incoming." },
+            { id: 'kills_5', trigger: 'enemy_kill', condition: s => s.enemiesKilled >= 5,
+              from: 'KOREX SECURITY', text: "Security drones should not be engaging miners. Must be a software glitch. Keep reporting contacts." },
+            { id: 'dist_4000', trigger: 'distance', condition: s => s.maxDist >= 4000,
+              from: '???', text: "Still alive? Good. The drones get worse past 4k. There's a reason Korex doesn't want you out here." },
+            { id: 'dist_6000', trigger: 'distance', condition: s => s.maxDist >= 6000,
+              from: 'KOREX DIRECTOR VOSS', text: "Impressive range, contractor. You've exceeded expected parameters. Consider... slowing down." },
+            { id: 'kills_25', trigger: 'enemy_kill', condition: s => s.enemiesKilled >= 25,
+              from: 'UNKNOWN FREQUENCY', text: "You fight well. The drones will adapt. Korex is watching your kill count. Be careful what you become." },
+            { id: 'dist_7000', trigger: 'distance', condition: s => s.maxDist >= 7000,
+              from: 'ENCRYPTED SIGNAL', text: "I was a miner too. Contract 4471. Went to 8000m and found something in the rocks. Something alive. They tried to silence me." },
             { id: 'dist_8000', trigger: 'distance', condition: s => s.maxDist >= 8000,
               from: '[SIGNAL ORIGIN: INSIDE ASTEROID]', text: 'We have been sleeping. Your drilling wakes us. We do not wish conflict. Tell your masters: stop digging. This is your only warning.' },
+            { id: 'dist_9000', trigger: 'distance', condition: s => s.maxDist >= 9000,
+              from: '[SIGNAL ORIGIN: INSIDE ASTEROID]', text: "We are not resources. We are not yours. But we do not blame the tool. Only the hand." },
+            { id: 'dist_10000', trigger: 'distance', condition: s => s.maxDist >= 10000,
+              from: 'KOREX AUTOMATED', text: "CONTRACT VIOLATION DETECTED. Miner unit exceeding operational boundary. Retrieval authorized." },
+            { id: 'kills_50', trigger: 'enemy_kill', condition: s => s.enemiesKilled >= 50,
+              from: 'KOREX SECURITY', text: "Enough. Those 'drones' cost more than your contract is worth. Last warning, miner." },
+            { id: 'dist_12000', trigger: 'distance', condition: s => s.maxDist >= 12000,
+              from: 'CONTRACT 4471', text: "Past 12k, the rocks glow. You'll see. That's them dreaming. Korex calls it 'crystal' but it's not mineral. It's memory." },
+            { id: 'dist_14000', trigger: 'distance', condition: s => s.maxDist >= 14000,
+              from: '[SIGNAL ORIGIN: INSIDE ASTEROID]', text: "You carry our fragments home and sell them. We feel each one go. But you also destroy the machines. Perhaps you are different." },
+            { id: 'dist_16000', trigger: 'distance', condition: s => s.maxDist >= 16000,
+              from: 'KOREX DIRECTOR VOSS', text: "Let me be direct: the entity in the asteroids is valuable beyond measure. We WILL extract it. You can be part of that future, or be removed from it." },
+            { id: 'dist_20000', trigger: 'distance', condition: s => s.maxDist >= 20000,
+              from: '[ALL FREQUENCIES]', text: "You've gone further than any miner. The edge of Korex's reach. What you do now... is your choice alone." },
+            { id: 'return_20k', trigger: 'dock', condition: s => s.maxDist >= 20000,
+              from: 'CONTRACT 4471', text: "You came back. I never did. Whatever you decide... thanks for proving it was possible." },
         ];
 
-        const QUESTS = [
-            { id: 'q_mine_5', name: 'First Haul', desc: 'Mine 5 asteroids', type: 'mine', target: 5, reward: 15 },
-            { id: 'q_sell_1', name: 'Cash In', desc: 'Sell cargo at base', type: 'sell', target: 1, reward: 10 },
-            { id: 'q_upgrade_1', name: 'Improvement', desc: 'Buy any upgrade', type: 'upgrade', target: 1, reward: 20 },
-            { id: 'q_dist_1000', name: 'Explorer', desc: 'Reach distance 1000', type: 'distance', target: 1000, reward: 30 },
-            { id: 'q_copper_3', name: 'Copper Rush', desc: 'Collect 3 copper', type: 'collect', resource: 'copper', target: 3, reward: 25 },
-            { id: 'q_kill_5', name: 'Pest Control', desc: 'Destroy 5 hostiles', type: 'kill', target: 5, reward: 50 },
-            { id: 'q_gold_5', name: 'Gold Fever', desc: 'Collect 5 gold', type: 'collect', resource: 'gold', target: 5, reward: 60 },
-            { id: 'q_dist_5000', name: 'Deep Space', desc: 'Reach distance 5000', type: 'distance', target: 5000, reward: 80 },
-            { id: 'q_kill_20', name: 'Enforcer', desc: 'Destroy 20 hostiles', type: 'kill', target: 20, reward: 100 },
-            { id: 'q_crystal_3', name: 'Crystal Clear', desc: 'Collect 3 crystal', type: 'collect', resource: 'crystal', target: 3, reward: 120 },
-        ];
+        const QUEST_TRACKS = {
+            mining: {
+                label: 'MINING', color: '#da6d28', icon: '⛏',
+                unlockCondition: s => s.totalDocks >= 1,
+                quests: [
+                    { name: 'First Haul', desc: 'Mine 5 asteroids', type: 'mine', target: 5, reward: 15 },
+                    { name: 'Copper Rush', desc: 'Collect 5 copper', type: 'collect', resource: 'copper', target: 5, reward: 30 },
+                    { name: 'Bulk Hauler', desc: 'Sell 20 resources total', type: 'sell_count', target: 20, reward: 50 },
+                    { name: 'Gold Fever', desc: 'Collect 5 gold', type: 'collect', resource: 'gold', target: 5, reward: 60 },
+                    { name: 'Platinum Standard', desc: 'Collect 3 platinum', type: 'collect', resource: 'platinum', target: 3, reward: 80 },
+                    { name: 'Full Load', desc: 'Sell with full cargo', type: 'sell_full', target: 1, reward: 100 },
+                    { name: 'Crystal Clear', desc: 'Collect 3 crystal', type: 'collect', resource: 'crystal', target: 3, reward: 120 },
+                    { name: 'Mineral Baron', desc: 'Sell 500cr in one trip', type: 'sell_value', target: 500, reward: 200 },
+                ]
+            },
+            exploration: {
+                label: 'EXPLORE', color: '#58a6ff', icon: '☉',
+                unlockCondition: s => s.maxDist >= 500,
+                quests: [
+                    { name: 'First Steps', desc: 'Reach distance 800', type: 'distance', target: 800, reward: 20 },
+                    { name: 'Beyond the Belt', desc: 'Reach distance 2000', type: 'distance', target: 2000, reward: 40 },
+                    { name: 'Deep Space', desc: 'Reach distance 4000', type: 'distance', target: 4000, reward: 70 },
+                    { name: 'The Outer Rim', desc: 'Reach distance 6000', type: 'distance', target: 6000, reward: 100 },
+                    { name: 'Signal Source', desc: 'Reach distance 8000', type: 'distance', target: 8000, reward: 130 },
+                    { name: 'The Void', desc: 'Reach distance 10000', type: 'distance', target: 10000, reward: 180 },
+                    { name: 'Edge of Known Space', desc: 'Reach distance 14000', type: 'distance', target: 14000, reward: 250 },
+                    { name: 'Event Horizon', desc: 'Reach distance 20000', type: 'distance', target: 20000, reward: 400 },
+                ]
+            },
+            combat: {
+                label: 'COMBAT', color: '#f85149', icon: '⚔',
+                unlockCondition: s => s.enemiesKilled >= 1,
+                quests: [
+                    { name: 'First Blood', desc: 'Destroy 3 hostiles', type: 'kill', target: 3, reward: 25 },
+                    { name: 'Pest Control', desc: 'Destroy 10 hostiles', type: 'kill', target: 10, reward: 50 },
+                    { name: 'Survivor', desc: 'Return from 3000+ alive', type: 'return_alive', target: 3000, reward: 75 },
+                    { name: 'Enforcer', desc: 'Destroy 25 hostiles', type: 'kill', target: 25, reward: 100 },
+                    { name: 'Drone Hunter', desc: 'Destroy 5 drones in one trip', type: 'kill_type', killType: 'drone', target: 5, reward: 80 },
+                    { name: 'Gunship Buster', desc: 'Destroy 3 gunships', type: 'kill_type', killType: 'gunship', target: 3, reward: 150 },
+                    { name: 'Untouchable', desc: 'Return from 5000+ full hull', type: 'return_full_hull', target: 5000, reward: 200 },
+                    { name: 'Warden', desc: 'Destroy 100 hostiles', type: 'kill', target: 100, reward: 300 },
+                ]
+            },
+            story: {
+                label: 'STORY', color: '#3fb950', icon: '◈',
+                unlockCondition: s => s.totalDocks >= 3,
+                quests: [
+                    { name: 'Report In', desc: 'Dock at base 3 times', type: 'dock', target: 3, reward: 20 },
+                    { name: 'Corporate Interests', desc: 'Reach distance 2000', type: 'distance', target: 2000, reward: 50 },
+                    { name: 'The Signal', desc: 'Reach distance 5000', type: 'distance', target: 5000, reward: 100 },
+                    { name: 'Investigate', desc: 'Destroy 15 enemies', type: 'kill', target: 15, reward: 150 },
+                    { name: 'Deep Cover', desc: 'Reach distance 12000', type: 'distance', target: 12000, reward: 250 },
+                    { name: 'The Truth', desc: 'Reach 20000 and return', type: 'return_alive', target: 20000, reward: 500 },
+                ]
+            }
+        };
 
         const ENEMY_BULLET_SPEED = 300;
         const ENEMY_BULLET_LIFETIME = 1.5;
@@ -414,7 +497,9 @@
                 cargo: [], maxCargo: 8,
                 fireTimer: 0,
                 turretTimer: 0,
-                invulnTimer: 0
+                invulnTimer: 0,
+                dashTimer: 0,
+                dashCooldown: 0
             },
             camera: { x: 0, y: 0 },
             base: { x: 0, y: 0, radius: BASE_DOCK_RADIUS, pulse: 0 },
@@ -432,8 +517,8 @@
             isMobile: false,
             lastTime: 0,
             credits: 0,
-            upgrades: { hull: 0, fuel: 0, cargo: 0, speed: 0, fireRate: 0, thrust: 0, scanner: 0, density: 0, magnet: 0, telesale: 0, turretRate: 0, turretRange: 0 },
-            baseUpgrades: { sellBonus: 0, defense: 0 },
+            upgrades: { hull: 0, fuel: 0, cargo: 0, speed: 0, fireRate: 0, thrust: 0, efficiency: 0, turretRate: 0, turretRange: 0, scanner: 0, density: 0, shield: 0, dash: 0, magnet: 0, piercing: 0, salvage: 0, telesale: 0 },
+            baseUpgrades: { sellBonus: 0, defense: 0, beacon: 0, refinery: 0 },
             derived: { maxSpeed: SHIP_MAX_SPEED, fireRate: FIRE_RATE_BASE, accel: SHIP_ACCEL },
             settings: { joystickSide: 'left', joystickMode: 'static' },
             docked: false,
@@ -449,9 +534,21 @@
                 active: null,
                 stats: { maxDist: 0, totalDocks: 0, totalSells: 0, totalDeaths: 0, enemiesKilled: 0, questsCompleted: 0 }
             },
-            quest: { current: 0, progress: 0, completed: [] },
-            questFlash: 0
+            questTracks: {
+                mining: { current: 0, progress: 0, unlocked: false },
+                exploration: { current: 0, progress: 0, unlocked: false },
+                combat: { current: 0, progress: 0, unlocked: false },
+                story: { current: 0, progress: 0, unlocked: false }
+            },
+            tripStats: { kills: {}, maxDist: 0, startHull: 3 },
+            questFlash: 0,
+            prestige: 0,
+            shipColor: '#58a6ff'
         };
+
+        function getSafeRadius() {
+            return BASE_SAFE_RADIUS + gameState.baseUpgrades.beacon * 100;
+        }
 
         function applyUpgrades() {
             const u = gameState.upgrades;
@@ -462,7 +559,12 @@
             gameState.derived = {
                 maxSpeed: SHIP_MAX_SPEED + u.speed * 50,
                 fireRate: FIRE_RATE_BASE * Math.pow(0.8, u.fireRate),
-                accel: SHIP_ACCEL + u.thrust * 100
+                accel: SHIP_ACCEL + u.thrust * 100,
+                fuelMult: 1 - u.efficiency * 0.15,
+                invulnTime: INVULN_TIME + u.shield * 0.5,
+                dashCooldown: u.dash > 0 ? (3 - u.dash * 0.4) : 0,
+                pierceCount: u.piercing,
+                salvageBonus: u.salvage
             };
         }
 
@@ -473,7 +575,9 @@
                     baseUpgrades: gameState.baseUpgrades,
                     credits: gameState.credits,
                     story: { seen: gameState.story.seen, stats: gameState.story.stats },
-                    quest: gameState.quest
+                    questTracks: gameState.questTracks,
+                    prestige: gameState.prestige,
+                    shipColor: gameState.shipColor
                 }));
             } catch(e) {}
         }
@@ -489,9 +593,20 @@
                         gameState.story.seen = saved.story.seen || [];
                         Object.assign(gameState.story.stats, saved.story.stats);
                     }
-                    if (saved.quest) {
-                        Object.assign(gameState.quest, saved.quest);
+                    if (saved.questTracks) {
+                        for (const [k, v] of Object.entries(saved.questTracks)) {
+                            if (gameState.questTracks[k]) Object.assign(gameState.questTracks[k], v);
+                        }
+                    } else if (saved.quest) {
+                        // Migrate old linear quest saves
+                        const stats = gameState.story.stats;
+                        gameState.questTracks.mining.unlocked = true;
+                        if (stats.maxDist >= 500) gameState.questTracks.exploration.unlocked = true;
+                        if (stats.enemiesKilled >= 1) gameState.questTracks.combat.unlocked = true;
+                        if (stats.totalDocks >= 3) gameState.questTracks.story.unlocked = true;
                     }
+                    if (saved.prestige) gameState.prestige = saved.prestige;
+                    if (saved.shipColor) gameState.shipColor = saved.shipColor;
                     applyUpgrades();
                     gameState.ship.hull = gameState.ship.maxHull;
                     gameState.ship.fuel = gameState.ship.maxFuel;
@@ -539,31 +654,76 @@
             }
         }
 
-        function advanceQuest(type, resource) {
-            const q = gameState.quest;
-            if (q.current >= QUESTS.length) return;
-            const quest = QUESTS[q.current];
-            if (quest.type !== type) return;
-            if (quest.resource && quest.resource !== resource) return;
-            if (type === 'distance') {
-                const dist = Math.sqrt(gameState.ship.x ** 2 + gameState.ship.y ** 2);
-                if (dist >= quest.target) q.progress = quest.target;
-                else return;
-            } else {
-                q.progress++;
+        function recordKill(enemyType) {
+            gameState.story.stats.enemiesKilled++;
+            gameState.tripStats.kills[enemyType] = (gameState.tripStats.kills[enemyType] || 0) + 1;
+            checkTransmissions('enemy_kill');
+            advanceQuest('kill');
+            advanceQuest('kill_type', enemyType);
+            checkQuestUnlocks();
+        }
+
+        function checkQuestUnlocks() {
+            const stats = gameState.story.stats;
+            for (const [trackId, track] of Object.entries(QUEST_TRACKS)) {
+                const qt = gameState.questTracks[trackId];
+                if (!qt.unlocked && track.unlockCondition(stats)) {
+                    qt.unlocked = true;
+                    // Auto-check distance quests already past target
+                    const quest = track.quests[qt.current];
+                    if (quest && quest.type === 'distance') advanceQuest('distance');
+                }
             }
-            if (q.progress >= quest.target) {
-                gameState.credits += quest.reward;
-                q.completed.push(quest.id);
-                gameState.story.stats.questsCompleted++;
-                gameState.questFlash = 2.5;
-                q.current++;
-                q.progress = 0;
-                checkTransmissions('quest_complete');
-                saveGame();
-                // Auto-check distance quests in case already past target
-                if (q.current < QUESTS.length && QUESTS[q.current].type === 'distance') {
-                    advanceQuest('distance');
+        }
+
+        function advanceQuest(type, resource) {
+            const stats = gameState.story.stats;
+            for (const [trackId, track] of Object.entries(QUEST_TRACKS)) {
+                const qt = gameState.questTracks[trackId];
+                if (!qt.unlocked || qt.current >= track.quests.length) continue;
+                const quest = track.quests[qt.current];
+
+                let matched = false;
+                if (quest.type === type) {
+                    if (quest.resource && quest.resource !== resource) continue;
+                    if (quest.killType && quest.killType !== resource) continue;
+                    if (type === 'distance') {
+                        const dist = Math.sqrt(gameState.ship.x ** 2 + gameState.ship.y ** 2);
+                        if (dist >= quest.target) { qt.progress = quest.target; matched = true; }
+                    } else if (type === 'return_alive') {
+                        const dist = Math.sqrt(gameState.ship.x ** 2 + gameState.ship.y ** 2);
+                        if (gameState.tripStats.maxDist >= quest.target && dist < BASE_DOCK_RADIUS * 2) {
+                            qt.progress = quest.target; matched = true;
+                        }
+                    } else if (type === 'return_full_hull') {
+                        const dist = Math.sqrt(gameState.ship.x ** 2 + gameState.ship.y ** 2);
+                        if (gameState.tripStats.maxDist >= quest.target && dist < BASE_DOCK_RADIUS * 2 && gameState.ship.hull >= gameState.ship.maxHull) {
+                            qt.progress = quest.target; matched = true;
+                        }
+                    } else if (type === 'sell_full') {
+                        matched = true; qt.progress++;
+                    } else if (type === 'sell_value') {
+                        // progress is set directly by caller with the sell amount
+                        matched = true;
+                    } else if (type === 'sell_count') {
+                        matched = true; qt.progress++;
+                    } else {
+                        qt.progress++; matched = true;
+                    }
+                }
+
+                if (matched && qt.progress >= quest.target) {
+                    gameState.credits += quest.reward;
+                    gameState.story.stats.questsCompleted++;
+                    gameState.questFlash = 2.5;
+                    qt.current++;
+                    qt.progress = 0;
+                    checkTransmissions('quest_complete');
+                    saveGame();
+                    // Auto-check if next quest is distance and already satisfied
+                    if (qt.current < track.quests.length && track.quests[qt.current].type === 'distance') {
+                        advanceQuest('distance');
+                    }
                 }
             }
         }
@@ -727,6 +887,17 @@
             if (gameState.shopOpen || gameState.dead || gameState.stranded || gameState.rescued) return;
             gameState.paused = !gameState.paused;
             document.getElementById('pause-overlay').classList.toggle('visible', gameState.paused);
+            if (gameState.paused) {
+                const s = gameState.story.stats;
+                const dist = Math.floor(Math.sqrt(gameState.ship.x**2 + gameState.ship.y**2));
+                document.getElementById('pause-stats').innerHTML =
+                    `MAX DIST: ${s.maxDist || 0}m<br>` +
+                    `ENEMIES KILLED: ${s.enemiesKilled || 0}<br>` +
+                    `TOTAL DOCKS: ${s.totalDocks || 0}<br>` +
+                    `TOTAL DEATHS: ${s.totalDeaths || 0}<br>` +
+                    `CREDITS EARNED: ${s.totalCredits || 0}<br>` +
+                    `CURRENT DIST: ${dist}m`;
+            }
             if (!gameState.paused) {
                 gameState.lastTime = performance.now();
                 requestAnimationFrame(gameLoop);
@@ -738,7 +909,6 @@
             const ship = gameState.ship;
             gameState.docked = true;
             ship.fuel = ship.maxFuel;
-            ship.hull = ship.maxHull;
             ship.invulnTimer = 0;
             ship.vx = 0; ship.vy = 0;
             spawnParticles(ship.x, ship.y, 15, '#58a6ff', 100);
@@ -746,6 +916,12 @@
             document.getElementById('dock-button').classList.remove('visible');
             gameState.story.stats.totalDocks++;
             checkTransmissions('dock');
+            advanceQuest('dock');
+            advanceQuest('return_alive');
+            if (ship.hull >= ship.maxHull) advanceQuest('return_full_hull');
+            ship.hull = ship.maxHull;
+            checkQuestUnlocks();
+            gameState.tripStats = { kills: {}, maxDist: 0, startHull: ship.maxHull };
             openShop();
         });
 
@@ -773,21 +949,78 @@
             const ship = gameState.ship;
             if (ship.cargo.length === 0) return;
             let earned = 0;
-            const bonus = 1 + gameState.baseUpgrades.sellBonus * 0.15;
-            ship.cargo.forEach(item => { earned += Math.round(item.value * bonus); });
+            const bonus = 1 + gameState.baseUpgrades.sellBonus * 0.15 + gameState.prestige * 0.1;
+            const refineryBonus = gameState.baseUpgrades.refinery * 0.2;
+            const cargoCount = ship.cargo.length;
+            const wasFull = cargoCount >= ship.maxCargo;
+            ship.cargo.forEach(item => {
+                let mult = bonus;
+                if ((item.type === 'platinum' || item.type === 'crystal') && refineryBonus > 0) mult += refineryBonus;
+                earned += Math.round(item.value * mult);
+            });
             gameState.credits += earned;
+            if (!gameState.story.stats.totalCredits) gameState.story.stats.totalCredits = 0;
+            gameState.story.stats.totalCredits += earned;
             ship.cargo = [];
             gameState.story.stats.totalSells++;
             checkTransmissions('sell');
             advanceQuest('sell');
+            for (let i = 0; i < cargoCount; i++) advanceQuest('sell_count');
+            if (wasFull) advanceQuest('sell_full');
+            // Check sell_value quest — set progress directly
+            for (const [trackId, track] of Object.entries(QUEST_TRACKS)) {
+                const qt = gameState.questTracks[trackId];
+                if (!qt.unlocked || qt.current >= track.quests.length) continue;
+                const quest = track.quests[qt.current];
+                if (quest.type === 'sell_value' && earned >= quest.target) {
+                    qt.progress = quest.target;
+                    gameState.credits += quest.reward;
+                    gameState.story.stats.questsCompleted++;
+                    gameState.questFlash = 2.5;
+                    qt.current++;
+                    qt.progress = 0;
+                    checkTransmissions('quest_complete');
+                }
+            }
+            checkQuestUnlocks();
             saveGame();
             updateShopUI();
+        }
+
+        function getUpgradeCost(key, level) {
+            const def = UPGRADE_DEFS.find(d => d.key === key);
+            const tier = def ? def.tier : 'basic';
+            return UPGRADE_COSTS[tier][level];
+        }
+
+        function getUpgradeDetail(key, level) {
+            const next = level + 1;
+            switch (key) {
+                case 'hull': return `HP ${3+level} → ${3+next}`;
+                case 'fuel': return `tank ${100+level*25} → ${100+next*25}`;
+                case 'cargo': return `slots ${8+level*4} → ${8+next*4}`;
+                case 'speed': return `max ${300+level*50} → ${300+next*50}`;
+                case 'fireRate': return `delay ${(0.3-level*0.04).toFixed(2)}s → ${(0.3-next*0.04).toFixed(2)}s`;
+                case 'thrust': return `accel ${500+level*100} → ${500+next*100}`;
+                case 'efficiency': return `drain -${level*15}% → -${next*15}%`;
+                case 'turretRate': return `delay ${(0.8-level*0.1).toFixed(1)}s → ${(0.8-next*0.1).toFixed(1)}s`;
+                case 'turretRange': return `range ${250+level*100} → ${250+next*100}`;
+                case 'scanner': return `+${next*10}% rare drops`;
+                case 'density': return `rock spawn +${next*15}%`;
+                case 'shield': return `invuln ${(1+level*0.5).toFixed(1)}s → ${(1+next*0.5).toFixed(1)}s`;
+                case 'dash': return `cooldown ${(3-level*0.4).toFixed(1)}s → ${(3-next*0.4).toFixed(1)}s`;
+                case 'magnet': return `pull ${80+level*40} → ${80+next*40}`;
+                case 'piercing': return `pierce ${level} → ${next} targets`;
+                case 'salvage': return `+${next} extra drops`;
+                case 'telesale': return `auto-sell under ${2+level}cr → ${2+next}cr`;
+                default: return '';
+            }
         }
 
         function buyUpgrade(key) {
             const level = gameState.upgrades[key];
             if (level >= 5) return;
-            const cost = UPGRADE_COSTS[level];
+            const cost = getUpgradeCost(key, level);
             if (gameState.credits < cost) return;
             gameState.credits -= cost;
             gameState.upgrades[key]++;
@@ -812,11 +1045,44 @@
             updateShopUI();
         }
 
+        const PRESTIGE_COLORS = ['#58a6ff', '#3fb950', '#f0883e', '#d2a8ff', '#f85149', '#e0e0e0'];
+
+        function canPrestige() {
+            const storyTrack = gameState.questTracks.story;
+            return storyTrack.unlocked && storyTrack.current >= QUEST_TRACKS.story.quests.length;
+        }
+
+        function doPrestige() {
+            if (!canPrestige()) return;
+            gameState.prestige++;
+            gameState.shipColor = PRESTIGE_COLORS[gameState.prestige % PRESTIGE_COLORS.length];
+            const keepSeen = [...gameState.story.seen];
+            const keepStats = { ...gameState.story.stats };
+            gameState.credits = 0;
+            for (const k of Object.keys(gameState.upgrades)) gameState.upgrades[k] = 0;
+            for (const k of Object.keys(gameState.baseUpgrades)) gameState.baseUpgrades[k] = 0;
+            for (const [trackId] of Object.entries(gameState.questTracks)) {
+                gameState.questTracks[trackId] = { current: 0, progress: 0, unlocked: false };
+            }
+            gameState.story.seen = keepSeen;
+            gameState.story.stats = keepStats;
+            gameState.story.queue = [];
+            gameState.story.active = null;
+            const ship = gameState.ship;
+            ship.x = 0; ship.y = 0; ship.vx = 0; ship.vy = 0;
+            ship.hull = 3; ship.fuel = 100;
+            ship.cargo = [];
+            applyUpgrades();
+            checkQuestUnlocks();
+            saveGame();
+            closeShop();
+        }
+
         function updateShopUI() {
             const ship = gameState.ship;
-            document.getElementById('shop-credits').textContent = `CREDITS: ${gameState.credits}`;
+            document.getElementById('shop-credits').textContent = `CREDITS: ${gameState.credits}${gameState.prestige ? ' ★'.repeat(gameState.prestige) : ''}`;
             document.getElementById('shop-cargo').textContent = `CARGO: ${ship.cargo.length}/${ship.maxCargo}`;
-            const bonus = 1 + gameState.baseUpgrades.sellBonus * 0.15;
+            const bonus = 1 + gameState.baseUpgrades.sellBonus * 0.15 + gameState.prestige * 0.1;
             const sellVal = ship.cargo.reduce((s, i) => s + Math.round(i.value * bonus), 0);
             document.getElementById('sell-btn').textContent = `SELL ALL (${sellVal}cr)`;
             document.getElementById('sell-btn').disabled = ship.cargo.length === 0;
@@ -845,12 +1111,14 @@
                 if (def.reqHull && gameState.upgrades.hull < def.reqHull) return;
                 if (def.reqBase && gameState.baseUpgrades[def.reqBase] < 1) return;
                 const level = gameState.upgrades[def.key];
-                const cost = level < 5 ? UPGRADE_COSTS[level] : null;
+                const cost = level < 5 ? getUpgradeCost(def.key, level) : null;
                 const pips = '■'.repeat(level) + '□'.repeat(5 - level);
+                const detail = level < 5 ? getUpgradeDetail(def.key, level) : '';
                 const row = document.createElement('div');
                 row.className = 'upgrade-row';
                 row.innerHTML = `<span class="upgrade-name">${def.label}</span>` +
                     `<span class="upgrade-pips">${pips}</span>` +
+                    `<span style="color:#6e7681;font-size:10px;margin:0 6px">${detail}</span>` +
                     `<span class="upgrade-cost">${cost ? cost + 'cr' : 'MAX'}</span>`;
                 const btn = document.createElement('button');
                 btn.className = 'btn';
@@ -880,6 +1148,25 @@
                 row.appendChild(btn);
                 baseContainer.appendChild(row);
             });
+
+            // Prestige button
+            let prestigeBtn = document.getElementById('prestige-btn');
+            if (canPrestige()) {
+                if (!prestigeBtn) {
+                    prestigeBtn = document.createElement('button');
+                    prestigeBtn.id = 'prestige-btn';
+                    prestigeBtn.className = 'btn';
+                    prestigeBtn.style.cssText = 'margin-top:20px;border-color:#d2a8ff;color:#d2a8ff;font-size:0.8rem;width:100%';
+                    prestigeBtn.addEventListener('click', () => {
+                        if (confirm('NEW CONTRACT: Reset all upgrades and credits for permanent +10% sell bonus. Proceed?')) doPrestige();
+                    });
+                    baseContainer.parentElement.appendChild(prestigeBtn);
+                }
+                prestigeBtn.textContent = `★ NEW CONTRACT (Prestige ${gameState.prestige + 1}) ★`;
+                prestigeBtn.style.display = '';
+            } else if (prestigeBtn) {
+                prestigeBtn.style.display = 'none';
+            }
         }
 
         // --- Death ---
@@ -1046,7 +1333,7 @@
                 vy: Math.sin(angle) * speed,
                 rotation: Math.random() * Math.PI * 2,
                 rotSpeed: (Math.random() - 0.5) * 2,
-                tier, radius: t.radius, hp: t.hp,
+                tier, radius: t.radius, hp: t.hp * (1 + Math.floor(distFromOrigin / 6000)),
                 resourceType,
                 vertices: generateRockVertices(t.radius, resourceType.name)
             });
@@ -1157,7 +1444,9 @@
 
             if (ship.thrust > 0 && ship.fuel > 0) {
                 const prevPct = ship.fuel / ship.maxFuel;
-                ship.fuel -= FUEL_DRAIN_RATE * ship.thrust * dt;
+                const currentDist2 = Math.sqrt(ship.x * ship.x + ship.y * ship.y);
+                const fuelRate = (FUEL_DRAIN_RATE + currentDist2 / 5000) * gameState.derived.fuelMult;
+                ship.fuel -= fuelRate * ship.thrust * dt;
                 if (ship.fuel < 0) ship.fuel = 0;
                 const newPct = ship.fuel / ship.maxFuel;
                 if (prevPct > 0.5 && newPct <= 0.5) {
@@ -1181,6 +1470,16 @@
             } else if (ship.fuel <= 0) {
                 ship.thrust = 0;
                 ship.invulnTimer = Infinity;
+            }
+
+            // Dash ability
+            if (ship.dashCooldown > 0) ship.dashCooldown -= dt;
+            if (derived.dashCooldown > 0 && gameState.keys['ShiftLeft'] && ship.dashCooldown <= 0 && ship.thrust > 0 && ship.fuel > 0) {
+                ship.vx += Math.cos(ship.angle) * 600;
+                ship.vy += Math.sin(ship.angle) * 600;
+                ship.dashCooldown = derived.dashCooldown;
+                ship.fuel -= 5;
+                spawnParticles(ship.x, ship.y, 8, '#58a6ff', 100);
             }
 
             const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
@@ -1207,10 +1506,12 @@
             if (gameState.questFlash > 0) gameState.questFlash -= dt;
 
             const currentDist = Math.sqrt(ship.x * ship.x + ship.y * ship.y);
+            if (currentDist > gameState.tripStats.maxDist) gameState.tripStats.maxDist = currentDist;
             if (currentDist > gameState.story.stats.maxDist) {
                 gameState.story.stats.maxDist = currentDist;
                 checkTransmissions('distance');
                 advanceQuest('distance');
+                checkQuestUnlocks();
             }
             updateTransmission(dt);
         }
@@ -1305,7 +1606,7 @@
 
                 if (defenseLevel > 0) {
                     const distToBase = Math.sqrt(rock.x * rock.x + rock.y * rock.y);
-                    if (distToBase < BASE_SAFE_RADIUS * 0.8) {
+                    if (distToBase < getSafeRadius() * 0.8) {
                         spawnParticles(rock.x, rock.y, 6, rock.resourceType.color, 100);
                         dropResources(rock);
                         gameState.rocks.splice(i, 1);
@@ -1322,7 +1623,7 @@
                 const sx = ship.x + Math.cos(angle) * dist;
                 const sy = ship.y + Math.sin(angle) * dist;
                 const distToBase = Math.sqrt(sx * sx + sy * sy);
-                if (distToBase < BASE_SAFE_RADIUS) continue;
+                if (distToBase < getSafeRadius()) continue;
                 const distFromOrigin = Math.sqrt(sx * sx + sy * sy);
                 const tier = pickTier(distFromOrigin);
                 spawnRock(sx, sy, tier);
@@ -1363,7 +1664,7 @@
                 if (baseMagnet) {
                     const bdx = r.x, bdy = r.y;
                     const bDist = Math.sqrt(bdx * bdx + bdy * bdy);
-                    if (bDist < BASE_SAFE_RADIUS && bDist > 20) {
+                    if (bDist < getSafeRadius() && bDist > 20) {
                         r.x -= (bdx / bDist) * 60 * dt;
                         r.y -= (bdy / bDist) * 60 * dt;
                     }
@@ -1404,7 +1705,8 @@
                     const rock = gameState.rocks[ri];
                     const dx = b.x - rock.x, dy = b.y - rock.y;
                     if (dx * dx + dy * dy < rock.radius * rock.radius) {
-                        gameState.bullets.splice(bi, 1);
+                        b.pierced = (b.pierced || 0) + 1;
+                        if (b.pierced > gameState.derived.pierceCount) gameState.bullets.splice(bi, 1);
                         rock.hp--;
                         spawnParticles(b.x, b.y, 3, rock.resourceType.color, 80);
                         if (rock.hp <= 0) {
@@ -1436,7 +1738,7 @@
                     const dist = Math.sqrt(dx * dx + dy * dy);
                     if (dist < rock.radius + ship.size * 0.6) {
                         ship.hull -= COLLISION_DAMAGE;
-                        ship.invulnTimer = INVULN_TIME;
+                        ship.invulnTimer = gameState.derived.invulnTime;
                         const angle = Math.atan2(dy, dx);
                         ship.vx += Math.cos(angle) * 200;
                         ship.vy += Math.sin(angle) * 200;
@@ -1467,18 +1769,21 @@
 
         // --- Enemies ---
         function spawnEnemy(type, x, y, attachedTo) {
-            const defs = { turret: { hp: 3, radius: 14, cooldown: 2 }, drone: { hp: 2, radius: 10, cooldown: 0.5 }, gunship: { hp: 6, radius: 18, cooldown: 3 } };
+            const defs = { turret: { hp: 3, radius: 14, cooldown: 2 }, drone: { hp: 2, radius: 10, cooldown: 0.5 }, gunship: { hp: 6, radius: 18, cooldown: 3 }, sentinel: { hp: 10, radius: 24, cooldown: 4 } };
             const def = defs[type];
+            const distFromOrigin = Math.sqrt(x * x + y * y);
+            const diffMult = 1 + (distFromOrigin / 5000) * 0.5;
             gameState.enemies.push({
                 x, y, vx: 0, vy: 0,
                 angle: Math.random() * Math.PI * 2,
-                type, hp: def.hp, maxHp: def.hp,
+                type, hp: Math.ceil(def.hp * diffMult), maxHp: Math.ceil(def.hp * diffMult),
                 radius: def.radius,
                 fireTimer: def.cooldown,
-                fireCooldown: def.cooldown,
+                fireCooldown: def.cooldown / Math.sqrt(diffMult),
                 attachedTo: attachedTo || null,
                 behavior: type === 'drone' ? { state: 'idle', timer: 1 + Math.random(), burstCount: 0 } :
-                          type === 'gunship' ? { orbitAngle: Math.random() * Math.PI * 2, orbitDist: 350 + Math.random() * 150 } : {}
+                          type === 'gunship' ? { orbitAngle: Math.random() * Math.PI * 2, orbitDist: 350 + Math.random() * 150 } :
+                          type === 'sentinel' ? { blinkTimer: 3 + Math.random() * 2, blinking: false } : {}
             });
         }
 
@@ -1498,12 +1803,10 @@
 
                 if (gameState.baseUpgrades.defense > 0) {
                     const distToBase = Math.sqrt(e.x * e.x + e.y * e.y);
-                    if (distToBase < BASE_SAFE_RADIUS * 0.8) {
+                    if (distToBase < getSafeRadius() * 0.8) {
                         spawnParticles(e.x, e.y, 8, '#f85149', 120);
                         gameState.enemies.splice(i, 1);
-                        gameState.story.stats.enemiesKilled++;
-                        checkTransmissions('enemy_kill');
-                        advanceQuest('kill');
+                        recordKill(e.type);
                         continue;
                     }
                 }
@@ -1513,9 +1816,7 @@
                         if (!gameState.rocks.includes(e.attachedTo)) {
                             gameState.enemies.splice(i, 1);
                             spawnParticles(e.x, e.y, 6, '#f85149', 100);
-                            gameState.story.stats.enemiesKilled++;
-                            checkTransmissions('enemy_kill');
-                            advanceQuest('kill');
+                            recordKill(e.type);
                             continue;
                         }
                         e.x = e.attachedTo.x;
@@ -1580,6 +1881,35 @@
                             });
                         }
                     }
+                } else if (e.type === 'sentinel') {
+                    const b = e.behavior;
+                    e.angle = Math.atan2(ship.y - e.y, ship.x - e.x);
+                    // Blink/teleport behavior
+                    b.blinkTimer -= dt;
+                    if (b.blinkTimer <= 0 && !b.blinking) {
+                        b.blinking = true;
+                        const teleAngle = Math.random() * Math.PI * 2;
+                        const teleDist = 200 + Math.random() * 200;
+                        e.x = ship.x + Math.cos(teleAngle) * teleDist;
+                        e.y = ship.y + Math.sin(teleAngle) * teleDist;
+                        spawnParticles(e.x, e.y, 6, '#e0e0e0', 80);
+                        b.blinkTimer = 2.5 + Math.random() * 2;
+                        b.blinking = false;
+                    }
+                    // Homing missile
+                    e.fireTimer -= dt;
+                    if (e.fireTimer <= 0 && distToShip < 700) {
+                        e.fireTimer = e.fireCooldown;
+                        const bAngle = e.angle;
+                        gameState.enemyBullets.push({
+                            x: e.x + Math.cos(bAngle) * e.radius,
+                            y: e.y + Math.sin(bAngle) * e.radius,
+                            vx: Math.cos(bAngle) * ENEMY_BULLET_SPEED * 0.6,
+                            vy: Math.sin(bAngle) * ENEMY_BULLET_SPEED * 0.6,
+                            life: ENEMY_BULLET_LIFETIME * 2,
+                            homing: true
+                        });
+                    }
                 }
             }
 
@@ -1599,6 +1929,31 @@
                 const d = 700 + Math.random() * 300;
                 spawnEnemy('gunship', ship.x + Math.cos(angle) * d, ship.y + Math.sin(angle) * d);
             }
+            // Sentinel spawning
+            const sentinelCount = gameState.enemies.filter(e => e.type === 'sentinel').length;
+            const maxSentinels = shipDist >= 12000 ? 2 : 1;
+            if (shipDist >= 8000 && sentinelCount < maxSentinels && Math.random() < 0.0005) {
+                const angle = Math.random() * Math.PI * 2;
+                const d = 500 + Math.random() * 300;
+                spawnEnemy('sentinel', ship.x + Math.cos(angle) * d, ship.y + Math.sin(angle) * d);
+            }
+            // Enemy waves past 4000
+            if (!gameState.waveTimer) gameState.waveTimer = 60 + Math.random() * 30;
+            if (shipDist >= 4000) {
+                gameState.waveTimer -= dt;
+                if (gameState.waveTimer <= 0) {
+                    gameState.waveTimer = 60 + Math.random() * 30;
+                    const waveSize = 3 + Math.floor(shipDist / 4000);
+                    const waveAngle = Math.random() * Math.PI * 2;
+                    for (let w = 0; w < Math.min(waveSize, 6); w++) {
+                        const spread = (w - waveSize / 2) * 0.3;
+                        const d = 700 + Math.random() * 200;
+                        spawnEnemy('drone', ship.x + Math.cos(waveAngle + spread) * d, ship.y + Math.sin(waveAngle + spread) * d);
+                    }
+                    gameState.fuelWarnFlash = 1.5;
+                    gameState.fuelWarnMsg = 'WAVE INCOMING';
+                }
+            }
         }
 
         function fireEnemyBullet(enemy) {
@@ -1615,6 +1970,19 @@
             const ship = gameState.ship;
             for (let i = gameState.enemyBullets.length - 1; i >= 0; i--) {
                 const b = gameState.enemyBullets[i];
+                if (b.homing) {
+                    const hdx = ship.x - b.x, hdy = ship.y - b.y;
+                    const targetAngle = Math.atan2(hdy, hdx);
+                    const currentAngle = Math.atan2(b.vy, b.vx);
+                    let diff = targetAngle - currentAngle;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    const turnRate = 1.5 * dt;
+                    const newAngle = currentAngle + Math.max(-turnRate, Math.min(turnRate, diff));
+                    const spd = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+                    b.vx = Math.cos(newAngle) * spd;
+                    b.vy = Math.sin(newAngle) * spd;
+                }
                 b.x += b.vx * dt;
                 b.y += b.vy * dt;
                 b.life -= dt;
@@ -1624,7 +1992,7 @@
                     const dx = b.x - ship.x, dy = b.y - ship.y;
                     if (dx * dx + dy * dy < (ship.size * 0.6) * (ship.size * 0.6)) {
                         ship.hull -= COLLISION_DAMAGE;
-                        ship.invulnTimer = INVULN_TIME;
+                        ship.invulnTimer = gameState.derived.invulnTime;
                         const angle = Math.atan2(dy, dx);
                         ship.vx -= Math.cos(angle) * 100;
                         ship.vy -= Math.sin(angle) * 100;
@@ -1651,7 +2019,8 @@
                         spawnParticles(b.x, b.y, 3, '#f85149', 80);
                         if (enemy.hp <= 0) {
                             spawnParticles(enemy.x, enemy.y, 12, '#f85149', 150);
-                            const dropCount = enemy.type === 'gunship' ? 3 : enemy.type === 'drone' ? (Math.random() < 0.5 ? 2 : 1) : 1;
+                            const baseDrops = enemy.type === 'sentinel' ? (4 + Math.floor(Math.random() * 2)) : enemy.type === 'gunship' ? 3 : enemy.type === 'drone' ? (Math.random() < 0.5 ? 2 : 1) : 1;
+                            const dropCount = baseDrops + gameState.derived.salvageBonus;
                             const scrapType = RESOURCE_TYPES.find(r => r.name === 'scrap');
                             for (let d = 0; d < dropCount; d++) {
                                 gameState.resources.push({
@@ -1663,9 +2032,7 @@
                                 });
                             }
                             gameState.enemies.splice(ei, 1);
-                            gameState.story.stats.enemiesKilled++;
-                            checkTransmissions('enemy_kill');
-                            advanceQuest('kill');
+                            recordKill(enemy.type);
                         }
                         break;
                     }
@@ -1680,7 +2047,7 @@
                     const dist = Math.sqrt(dx * dx + dy * dy);
                     if (dist < enemy.radius + ship.size * 0.6) {
                         ship.hull -= COLLISION_DAMAGE;
-                        ship.invulnTimer = INVULN_TIME;
+                        ship.invulnTimer = gameState.derived.invulnTime;
                         const angle = Math.atan2(dy, dx);
                         ship.vx += Math.cos(angle) * 200;
                         ship.vy += Math.sin(angle) * 200;
@@ -1689,9 +2056,7 @@
                         if (enemy.hp <= 0) {
                             spawnParticles(enemy.x, enemy.y, 8, '#f85149', 120);
                             gameState.enemies.splice(ei, 1);
-                            gameState.story.stats.enemiesKilled++;
-                            checkTransmissions('enemy_kill');
-                            advanceQuest('kill');
+                            recordKill(enemy.type);
                         }
                         if (ship.hull <= 0) { die(); return; }
                         break;
@@ -1970,6 +2335,28 @@
                     ctx.beginPath();
                     ctx.arc(0, 0, r * 0.5, 0, Math.PI * 2);
                     ctx.stroke();
+                } else if (e.type === 'sentinel') {
+                    const r = e.radius;
+                    ctx.strokeStyle = '#e0e0e0';
+                    ctx.beginPath();
+                    for (let p = 0; p < 6; p++) {
+                        const a = (p / 6) * Math.PI * 2;
+                        const px = Math.cos(a) * r, py = Math.sin(a) * r;
+                        p === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+                    // Inner eye
+                    ctx.beginPath();
+                    ctx.arc(0, 0, r * 0.35, 0, Math.PI * 2);
+                    ctx.stroke();
+                    // Blink flash
+                    if (e.behavior.blinkTimer && e.behavior.blinkTimer < 0.3) {
+                        ctx.strokeStyle = 'rgba(224, 224, 224, 0.5)';
+                        ctx.beginPath();
+                        ctx.arc(0, 0, r * 1.5, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
                 }
 
                 ctx.restore();
@@ -2155,7 +2542,7 @@
                     break;
             }
             ctx.closePath();
-            ctx.strokeStyle = '#58a6ff';
+            ctx.strokeStyle = gameState.shipColor;
             ctx.lineWidth = 2;
             ctx.stroke();
 
@@ -2311,7 +2698,7 @@
 
             ctx.fillStyle = '#484f58';
             ctx.textAlign = 'right';
-            ctx.fillText('v1.2', canvas.width - 14, 24);
+            ctx.fillText('v2.0', canvas.width - 14, 24);
             ctx.textAlign = 'left';
 
             ctx.fillStyle = '#8b949e';
@@ -2363,19 +2750,107 @@
                 ctx.fillText('HOME', ix, iy + 14);
             }
 
-            // Quest HUD
-            if (gameState.quest.current < QUESTS.length) {
-                const quest = QUESTS[gameState.quest.current];
-                ctx.textAlign = 'right';
-                ctx.font = '11px Courier New';
-                ctx.fillStyle = '#58a6ff';
-                const qx = canvas.width - 14;
-                ctx.fillText(quest.name, qx, 44);
+            // Return-to-base arrow when carrying valuable cargo
+            const cargoVal = ship.cargo.reduce((s, i) => s + i.value, 0);
+            if (cargoVal > 50 && dist > 200) {
+                const arrowAngle = Math.atan2(-ship.y, -ship.x);
+                const ax = canvas.width / 2 + Math.cos(arrowAngle) * 90;
+                const ay = canvas.height / 2 + Math.sin(arrowAngle) * 90;
+                ctx.save();
+                ctx.translate(ax, ay);
+                ctx.rotate(arrowAngle);
+                ctx.strokeStyle = '#3fb950';
+                ctx.globalAlpha = 0.4 + Math.sin(Date.now() * 0.003) * 0.2;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.moveTo(8, 0); ctx.lineTo(-4, 5);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+                ctx.restore();
+            }
+
+            // Minimap (bottom-left)
+            const mmSize = 100;
+            const mmX = 14;
+            const mmY = canvas.height - mmSize - 14;
+            const mmScale = 20000 / (mmSize / 2);
+            ctx.save();
+            ctx.globalAlpha = 0.7;
+            ctx.strokeStyle = '#21262d';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(mmX, mmY, mmSize, mmSize);
+
+            // Distance rings on minimap
+            const rings = [2000, 5000, 10000];
+            ctx.strokeStyle = '#161b22';
+            rings.forEach(r => {
+                const rr = r / mmScale;
+                ctx.beginPath();
+                ctx.arc(mmX + mmSize/2, mmY + mmSize/2, rr, 0, Math.PI * 2);
+                ctx.stroke();
+            });
+
+            // Base dot
+            const baseMmX = mmX + mmSize/2;
+            const baseMmY = mmY + mmSize/2;
+            ctx.fillStyle = '#3fb950';
+            ctx.beginPath();
+            ctx.arc(baseMmX, baseMmY, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Ship dot
+            const shipMmX = mmX + mmSize/2 + ship.x / mmScale;
+            const shipMmY = mmY + mmSize/2 + ship.y / mmScale;
+            ctx.fillStyle = '#58a6ff';
+            ctx.beginPath();
+            ctx.arc(shipMmX, shipMmY, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Radar dots (enemies + resources) if radar upgrade
+            if (gameState.upgrades.scanner >= 1) {
+                const radarRange = 800 + gameState.upgrades.scanner * 400;
+                for (const e of gameState.enemies) {
+                    const edx = e.x - ship.x, edy = e.y - ship.y;
+                    if (Math.sqrt(edx*edx + edy*edy) > radarRange) continue;
+                    const emx = mmX + mmSize/2 + e.x / mmScale;
+                    const emy = mmY + mmSize/2 + e.y / mmScale;
+                    if (emx < mmX || emx > mmX+mmSize || emy < mmY || emy > mmY+mmSize) continue;
+                    ctx.fillStyle = '#f85149';
+                    ctx.beginPath();
+                    ctx.arc(emx, emy, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                for (const r of gameState.resources) {
+                    const rdx = r.x - ship.x, rdy = r.y - ship.y;
+                    if (Math.sqrt(rdx*rdx + rdy*rdy) > radarRange) continue;
+                    const rmx = mmX + mmSize/2 + r.x / mmScale;
+                    const rmy = mmY + mmSize/2 + r.y / mmScale;
+                    if (rmx < mmX || rmx > mmX+mmSize || rmy < mmY || rmy > mmY+mmSize) continue;
+                    ctx.fillStyle = r.color;
+                    ctx.beginPath();
+                    ctx.arc(rmx, rmy, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+
+            // Quest HUD - show all active tracks
+            ctx.textAlign = 'right';
+            const qx = canvas.width - 14;
+            let qy = 44;
+            for (const [trackId, track] of Object.entries(QUEST_TRACKS)) {
+                const qt = gameState.questTracks[trackId];
+                if (!qt.unlocked || qt.current >= track.quests.length) continue;
+                const quest = track.quests[qt.current];
+                ctx.font = '10px Courier New';
+                ctx.fillStyle = track.color;
+                ctx.fillText(`${track.icon} ${quest.name}`, qx, qy);
                 ctx.fillStyle = '#6e7681';
-                ctx.fillText(quest.desc, qx, 58);
-                ctx.fillStyle = '#8b949e';
-                const prog = quest.type === 'distance' ? Math.min(Math.floor(Math.sqrt(ship.x*ship.x+ship.y*ship.y)), quest.target) : gameState.quest.progress;
-                ctx.fillText(`${prog}/${quest.target}`, qx, 72);
+                let prog = qt.progress;
+                if (quest.type === 'distance') prog = Math.min(Math.floor(Math.sqrt(ship.x*ship.x+ship.y*ship.y)), quest.target);
+                else if (quest.type === 'return_alive' || quest.type === 'return_full_hull') prog = Math.min(Math.floor(gameState.tripStats.maxDist), quest.target);
+                ctx.fillText(`${prog}/${quest.target}`, qx, qy + 12);
+                qy += 28;
             }
 
             // Quest complete flash
@@ -2503,12 +2978,14 @@
         window.buyUpgrade = buyUpgrade;
         window.buyBaseUpgrade = buyBaseUpgrade;
         window.gameLoop = gameLoop;
-        window.QUESTS = QUESTS;
+        window.QUEST_TRACKS = QUEST_TRACKS;
         try { detectMobile(); } catch(e) { console.warn('Mobile init failed:', e); }
         loadGame();
         applyUpgrades();
+        checkQuestUnlocks();
         gameState.ship.hull = gameState.ship.maxHull;
         gameState.ship.fuel = gameState.ship.maxFuel;
+        gameState.tripStats.startHull = gameState.ship.maxHull;
 
         ctx.fillStyle = '#0d1117';
         ctx.fillRect(0, 0, canvas.width, canvas.height);

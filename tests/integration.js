@@ -149,7 +149,7 @@ async function run() {
     const afterDestroy = await page.evaluate(() => ({
         cargo: gameState.ship.cargo.length,
         resources: gameState.resources.length,
-        questProgress: gameState.quest.progress
+        questProgress: gameState.questTracks.mining.progress
     }));
     console.log('   After combat:', afterDestroy);
     
@@ -323,14 +323,19 @@ async function run() {
 
     // Step 12: Verify quest progress
     console.log('12. Checking quest system...');
-    const questState = await page.evaluate(() => ({
-        currentQuest: QUESTS[gameState.quest.current]?.name || 'ALL DONE',
-        progress: gameState.quest.progress,
-        target: QUESTS[gameState.quest.current]?.target || 0,
-        completed: gameState.quest.completed.length
-    }));
-    console.log(`   Active quest: "${questState.currentQuest}" (${questState.progress}/${questState.target})`);
-    console.log(`   Completed: ${questState.completed}`);
+    const questState = await page.evaluate(() => {
+        const tracks = gameState.questTracks;
+        const active = [];
+        for (const [key, track] of Object.entries(tracks)) {
+            if (track.unlocked) {
+                const def = QUEST_TRACKS[key];
+                const q = def.quests[track.current];
+                active.push({ track: key, quest: q ? q.name : 'DONE', progress: track.progress, target: q ? q.target : 0 });
+            }
+        }
+        return active;
+    });
+    console.log(`   Active quests: ${JSON.stringify(questState)}`);
     console.log('   ✓ Quest system active\n');
 
     // Take final screenshot
