@@ -227,6 +227,8 @@
         <p id="shop-cargo">CARGO: 0/8</p>
         <button class="btn btn-sell" id="sell-btn">SELL ALL</button>
         <div class="shop-section" id="shop-upgrades"></div>
+        <p style="color:#3fb950;margin-top:12px;font-family:'Courier New',monospace;font-size:0.9rem">— BASE —</p>
+        <div class="shop-section" id="shop-base-upgrades"></div>
         <button class="btn" id="undock-btn">UNDOCK</button>
     </div>
     <div id="death-overlay">
@@ -297,11 +299,11 @@
         };
 
         const RESOURCE_TYPES = [
-            { name: 'iron',     color: '#8b949e', minDist: 0,    value: 1 },
-            { name: 'copper',   color: '#f0883e', minDist: 500,  value: 3 },
-            { name: 'gold',     color: '#d2a8ff', minDist: 1500, value: 8 },
-            { name: 'platinum', color: '#58a6ff', minDist: 3000, value: 20 },
-            { name: 'crystal',  color: '#3fb950', minDist: 5000, value: 50 }
+            { name: 'iron',     color: '#8b949e', minDist: 0,    value: 2 },
+            { name: 'copper',   color: '#f0883e', minDist: 500,  value: 5 },
+            { name: 'gold',     color: '#d2a8ff', minDist: 1500, value: 12 },
+            { name: 'platinum', color: '#58a6ff', minDist: 3000, value: 25 },
+            { name: 'crystal',  color: '#3fb950', minDist: 5000, value: 60 }
         ];
 
         const UPGRADE_DEFS = [
@@ -312,7 +314,13 @@
             { key: 'fireRate', label: 'FIRE RATE', desc: 'faster' },
             { key: 'thrust',   label: 'THRUST',    desc: '+100 accel' },
             { key: 'scanner',  label: 'SCANNER',   desc: 'better drops' },
-            { key: 'density',  label: 'DENSITY',   desc: 'more rocks' }
+            { key: 'density',  label: 'DENSITY',   desc: 'more rocks' },
+            { key: 'magnet',   label: 'MAGNET',    desc: 'pull resources' }
+        ];
+
+        const BASE_UPGRADE_DEFS = [
+            { key: 'sellBonus', label: 'TRADE HUB', desc: '+15% sell', costs: [50, 150, 400] },
+            { key: 'defense',   label: 'DEFENSE',   desc: 'auto-destroy + magnet', costs: [75, 200, 500] }
         ];
 
         // --- Game State ---
@@ -345,7 +353,8 @@
             isMobile: false,
             lastTime: 0,
             credits: 0,
-            upgrades: { hull: 0, fuel: 0, cargo: 0, speed: 0, fireRate: 0, thrust: 0, scanner: 0, density: 0 },
+            upgrades: { hull: 0, fuel: 0, cargo: 0, speed: 0, fireRate: 0, thrust: 0, scanner: 0, density: 0, magnet: 0 },
+            baseUpgrades: { sellBonus: 0, defense: 0 },
             derived: { maxSpeed: SHIP_MAX_SPEED, fireRate: FIRE_RATE_BASE, accel: SHIP_ACCEL },
             settings: { joystickSide: 'left', joystickMode: 'static' },
             docked: false,
@@ -374,6 +383,7 @@
             try {
                 localStorage.setItem('asteroids-save', JSON.stringify({
                     upgrades: gameState.upgrades,
+                    baseUpgrades: gameState.baseUpgrades,
                     credits: gameState.credits
                 }));
             } catch(e) {}
@@ -384,6 +394,7 @@
                 const saved = JSON.parse(localStorage.getItem('asteroids-save'));
                 if (saved) {
                     Object.assign(gameState.upgrades, saved.upgrades);
+                    if (saved.baseUpgrades) Object.assign(gameState.baseUpgrades, saved.baseUpgrades);
                     gameState.credits = saved.credits || 0;
                     applyUpgrades();
                     gameState.ship.hull = gameState.ship.maxHull;
@@ -556,7 +567,8 @@
         function sellCargo() {
             const ship = gameState.ship;
             let earned = 0;
-            ship.cargo.forEach(item => { earned += item.value; });
+            const bonus = 1 + gameState.baseUpgrades.sellBonus * 0.15;
+            ship.cargo.forEach(item => { earned += Math.round(item.value * bonus); });
             gameState.credits += earned;
             ship.cargo = [];
             saveGame();
@@ -573,6 +585,18 @@
             applyUpgrades();
             gameState.ship.hull = Math.min(gameState.ship.hull + (key === 'hull' ? 1 : 0), gameState.ship.maxHull);
             gameState.ship.fuel = gameState.ship.maxFuel;
+            saveGame();
+            updateShopUI();
+        }
+
+        function buyBaseUpgrade(key) {
+            const def = BASE_UPGRADE_DEFS.find(d => d.key === key);
+            const level = gameState.baseUpgrades[key];
+            if (level >= 3) return;
+            const cost = def.costs[level];
+            if (gameState.credits < cost) return;
+            gameState.credits -= cost;
+            gameState.baseUpgrades[key]++;
             saveGame();
             updateShopUI();
         }
@@ -603,6 +627,26 @@
                 btn.addEventListener('click', () => buyUpgrade(def.key));
                 row.appendChild(btn);
                 container.appendChild(row);
+            });
+
+            const baseContainer = document.getElementById('shop-base-upgrades');
+            baseContainer.innerHTML = '';
+            BASE_UPGRADE_DEFS.forEach(def => {
+                const level = gameState.baseUpgrades[def.key];
+                const cost = level < 3 ? def.costs[level] : null;
+                const pips = '■'.repeat(level) + '□'.repeat(3 - level);
+                const row = document.createElement('div');
+                row.className = 'upgrade-row';
+                row.innerHTML = `<span class="upgrade-name">${def.label}</span>` +
+                    `<span class="upgrade-pips">${pips}</span>` +
+                    `<span class="upgrade-cost">${cost ? cost + 'cr' : 'MAX'}</span>`;
+                const btn = document.createElement('button');
+                btn.className = 'btn';
+                btn.textContent = 'BUY';
+                btn.disabled = !cost || gameState.credits < cost;
+                btn.addEventListener('click', () => buyBaseUpgrade(def.key));
+                row.appendChild(btn);
+                baseContainer.appendChild(row);
             });
         }
 
@@ -732,23 +776,34 @@
         }
 
         // --- Rock generation ---
-        function generateRockVertices(radius) {
-            const count = 7 + Math.floor(Math.random() * 5);
+        function generateRockVertices(radius, typeName) {
+            let count;
+            if (typeName === 'gold') {
+                count = 5 + Math.floor(Math.random() * 2);
+            } else {
+                count = 7 + Math.floor(Math.random() * 5);
+            }
             const verts = [];
             for (let i = 0; i < count; i++) {
                 const angle = (i / count) * Math.PI * 2;
-                const dist = radius * (0.7 + Math.random() * 0.3);
+                let dist;
+                if (typeName === 'gold') {
+                    dist = radius * (i % 2 === 0 ? 1.0 : 0.55);
+                } else {
+                    dist = radius * (0.7 + Math.random() * 0.3);
+                }
                 verts.push({ angle, dist });
             }
             return verts;
         }
 
-        function spawnRock(x, y, tier) {
+        function spawnRock(x, y, tier, resourceTypeOverride) {
             const t = ROCK_TIERS[tier];
             const distFromOrigin = Math.sqrt(x * x + y * y);
             const driftScale = 1 + distFromOrigin / 3000;
             const angle = Math.random() * Math.PI * 2;
             const speed = ROCK_DRIFT_BASE * driftScale * (0.5 + Math.random());
+            const resourceType = resourceTypeOverride || pickResource(distFromOrigin);
             gameState.rocks.push({
                 x, y,
                 vx: Math.cos(angle) * speed,
@@ -756,7 +811,8 @@
                 rotation: Math.random() * Math.PI * 2,
                 rotSpeed: (Math.random() - 0.5) * 2,
                 tier, radius: t.radius, hp: t.hp,
-                vertices: generateRockVertices(t.radius)
+                resourceType,
+                vertices: generateRockVertices(t.radius, resourceType.name)
             });
         }
 
@@ -807,10 +863,9 @@
         }
 
         function dropResources(rock) {
-            const dist = Math.sqrt(rock.x * rock.x + rock.y * rock.y);
             const count = rock.tier === 'large' ? 3 : rock.tier === 'medium' ? 2 : 1;
             for (let i = 0; i < count; i++) {
-                const type = pickResource(dist);
+                const type = rock.resourceType;
                 const offset = 20;
                 gameState.resources.push({
                     x: rock.x + (Math.random() - 0.5) * offset,
@@ -966,6 +1021,7 @@
 
         function updateRocks(dt) {
             const ship = gameState.ship;
+            const defenseLevel = gameState.baseUpgrades.defense;
 
             for (let i = gameState.rocks.length - 1; i >= 0; i--) {
                 const rock = gameState.rocks[i];
@@ -976,6 +1032,16 @@
                 const dx = rock.x - ship.x, dy = rock.y - ship.y;
                 if (dx * dx + dy * dy > ROCK_DESPAWN_RADIUS * ROCK_DESPAWN_RADIUS) {
                     gameState.rocks.splice(i, 1);
+                    continue;
+                }
+
+                if (defenseLevel > 0) {
+                    const distToBase = Math.sqrt(rock.x * rock.x + rock.y * rock.y);
+                    if (distToBase < BASE_SAFE_RADIUS * 0.8) {
+                        spawnParticles(rock.x, rock.y, 6, rock.resourceType.color, 100);
+                        dropResources(rock);
+                        gameState.rocks.splice(i, 1);
+                    }
                 }
             }
 
@@ -1006,6 +1072,8 @@
 
         function updateResources(dt) {
             const ship = gameState.ship;
+            const magnetRange = gameState.upgrades.magnet > 0 ? 50 + gameState.upgrades.magnet * 30 : 0;
+            const baseMagnet = gameState.baseUpgrades.defense >= 2;
             for (let i = gameState.resources.length - 1; i >= 0; i--) {
                 const r = gameState.resources[i];
                 r.life -= dt;
@@ -1017,6 +1085,21 @@
                 if (r.life <= 0 || dx * dx + dy * dy > ROCK_DESPAWN_RADIUS * ROCK_DESPAWN_RADIUS) {
                     gameState.resources.splice(i, 1);
                     continue;
+                }
+
+                if (baseMagnet) {
+                    const bdx = r.x, bdy = r.y;
+                    const bDist = Math.sqrt(bdx * bdx + bdy * bdy);
+                    if (bDist < BASE_SAFE_RADIUS && bDist > 20) {
+                        r.x -= (bdx / bDist) * 60 * dt;
+                        r.y -= (bdy / bDist) * 60 * dt;
+                    }
+                }
+
+                if (magnetRange > 0 && dist < magnetRange && dist > RESOURCE_COLLECT_RADIUS) {
+                    const pullSpeed = 100;
+                    r.x -= (dx / dist) * pullSpeed * dt;
+                    r.y -= (dy / dist) * pullSpeed * dt;
                 }
 
                 if (dist < RESOURCE_COLLECT_RADIUS) {
@@ -1043,17 +1126,18 @@
                     if (dx * dx + dy * dy < rock.radius * rock.radius) {
                         gameState.bullets.splice(bi, 1);
                         rock.hp--;
-                        spawnParticles(b.x, b.y, 3, '#8b949e', 80);
+                        spawnParticles(b.x, b.y, 3, rock.resourceType.color, 80);
                         if (rock.hp <= 0) {
                             const tier = ROCK_TIERS[rock.tier];
-                            spawnParticles(rock.x, rock.y, 10, '#8b949e', 150);
+                            spawnParticles(rock.x, rock.y, 10, rock.resourceType.color, 150);
                             dropResources(rock);
                             if (tier.children > 0) {
                                 for (let c = 0; c < tier.children; c++) {
                                     spawnRock(
                                         rock.x + (Math.random() - 0.5) * 20,
                                         rock.y + (Math.random() - 0.5) * 20,
-                                        tier.childTier
+                                        tier.childTier,
+                                        rock.resourceType
                                     );
                                 }
                             }
@@ -1124,22 +1208,33 @@
             const base = gameState.base;
             const sx = base.x - gameState.camera.x + canvas.width / 2;
             const sy = base.y - gameState.camera.y + canvas.height / 2;
-            if (sx < -100 || sx > canvas.width + 100 || sy < -100 || sy > canvas.height + 100) return;
+            if (sx < -150 || sx > canvas.width + 150 || sy < -150 || sy > canvas.height + 150) return;
 
             gameState.base.pulse += 0.02;
-            const pulse = 0.5 + Math.sin(gameState.base.pulse) * 0.3;
+            const t = gameState.base.pulse;
+            const pulse = 0.5 + Math.sin(t) * 0.3;
+            const bu = gameState.baseUpgrades;
 
             ctx.beginPath();
             ctx.arc(sx, sy, base.radius, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(63,185,80,${pulse * 0.4})`;
+            ctx.strokeStyle = `rgba(63,185,80,${pulse * 0.3})`;
             ctx.lineWidth = 1;
             ctx.stroke();
 
             ctx.beginPath();
+            for (let i = 0; i < 8; i++) {
+                const a = (i / 8) * Math.PI * 2 - t * 0.15;
+                ctx[i === 0 ? 'moveTo' : 'lineTo'](sx + Math.cos(a) * 35, sy + Math.sin(a) * 35);
+            }
+            ctx.closePath();
+            ctx.strokeStyle = '#3fb950';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            ctx.beginPath();
             for (let i = 0; i < 6; i++) {
-                const a = (i / 6) * Math.PI * 2 + gameState.base.pulse * 0.3;
-                const method = i === 0 ? 'moveTo' : 'lineTo';
-                ctx[method](sx + Math.cos(a) * 25, sy + Math.sin(a) * 25);
+                const a = (i / 6) * Math.PI * 2 + t * 0.3;
+                ctx[i === 0 ? 'moveTo' : 'lineTo'](sx + Math.cos(a) * 16, sy + Math.sin(a) * 16);
             }
             ctx.closePath();
             ctx.strokeStyle = '#3fb950';
@@ -1148,12 +1243,117 @@
 
             ctx.beginPath();
             for (let i = 0; i < 6; i++) {
-                const a = (i / 6) * Math.PI * 2 + gameState.base.pulse * 0.3;
-                ctx.moveTo(sx + Math.cos(a) * 12, sy + Math.sin(a) * 12);
-                ctx.lineTo(sx + Math.cos(a) * 25, sy + Math.sin(a) * 25);
+                const a = (i / 6) * Math.PI * 2 + t * 0.3;
+                ctx.moveTo(sx + Math.cos(a) * 16, sy + Math.sin(a) * 16);
+                ctx.lineTo(sx + Math.cos(a) * 33, sy + Math.sin(a) * 33);
             }
             ctx.strokeStyle = '#3fb950';
             ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.beginPath();
+            for (let i = 0; i < 4; i++) {
+                const a = (i / 4) * Math.PI * 2 + t * 0.5;
+                ctx.moveTo(sx + Math.cos(a) * 35, sy + Math.sin(a) * 35);
+                ctx.lineTo(sx + Math.cos(a) * 48, sy + Math.sin(a) * 48);
+                const tipX = sx + Math.cos(a) * 48, tipY = sy + Math.sin(a) * 48;
+                const pa = a + Math.PI / 2;
+                ctx.moveTo(tipX + Math.cos(pa) * 4, tipY + Math.sin(pa) * 4);
+                ctx.lineTo(tipX - Math.cos(pa) * 4, tipY - Math.sin(pa) * 4);
+            }
+            ctx.strokeStyle = '#3fb950';
+            ctx.lineWidth = 1;
+            ctx.globalAlpha = 0.6;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+
+            ctx.beginPath();
+            for (let i = 0; i < 4; i++) {
+                const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+                const bx = sx + Math.cos(a) * base.radius * 0.85;
+                const by = sy + Math.sin(a) * base.radius * 0.85;
+                const inA = a + Math.PI;
+                ctx.moveTo(bx + Math.cos(inA + 0.3) * 6, by + Math.sin(inA + 0.3) * 6);
+                ctx.lineTo(bx + Math.cos(inA) * 10, by + Math.sin(inA) * 10);
+                ctx.lineTo(bx + Math.cos(inA - 0.3) * 6, by + Math.sin(inA - 0.3) * 6);
+            }
+            ctx.strokeStyle = `rgba(63,185,80,${pulse})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            if (bu.sellBonus > 0) {
+                for (let i = 0; i < bu.sellBonus * 2; i++) {
+                    const a = (i / (bu.sellBonus * 2)) * Math.PI * 2 + t * 0.1;
+                    ctx.beginPath();
+                    ctx.arc(sx + Math.cos(a) * 35, sy + Math.sin(a) * 35, 3, 0, Math.PI * 2);
+                    ctx.strokeStyle = '#3fb950';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+            }
+
+            if (bu.defense > 0) {
+                for (let i = 0; i < bu.defense * 2; i++) {
+                    const a = (i / (bu.defense * 2)) * Math.PI * 2 - t * 0.8;
+                    const tx = sx + Math.cos(a) * base.radius * 0.95;
+                    const ty = sy + Math.sin(a) * base.radius * 0.95;
+                    ctx.beginPath();
+                    ctx.arc(tx, ty, 2, 0, Math.PI * 2);
+                    ctx.strokeStyle = '#f85149';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                }
+                if (bu.defense >= 2) {
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, 26, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(88,166,255,0.3)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([3, 3]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+        }
+
+        function drawRockStripes(radius) {
+            const stripeAngle = Math.PI / 6;
+            const cos = Math.cos(stripeAngle), sin = Math.sin(stripeAngle);
+            const spacing = radius * 0.45;
+            ctx.beginPath();
+            for (let offset = -1; offset <= 1; offset++) {
+                const cx = -sin * offset * spacing;
+                const cy = cos * offset * spacing;
+                ctx.moveTo(cx + cos * radius * 0.8, cy + sin * radius * 0.8);
+                ctx.lineTo(cx - cos * radius * 0.8, cy - sin * radius * 0.8);
+            }
+            ctx.stroke();
+        }
+
+        function drawRockDots(radius) {
+            const positions = [[0.3,0.2],[-0.2,0.4],[0.1,-0.3],[-0.4,-0.1],[0.35,-0.25]];
+            ctx.beginPath();
+            for (const [px, py] of positions) {
+                const x = px * radius, y = py * radius;
+                ctx.moveTo(x + 2.5, y);
+                ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+            }
+            ctx.stroke();
+        }
+
+        function drawRockVeins(vertices) {
+            ctx.beginPath();
+            const len = vertices.length;
+            for (let i = 0; i < len; i += 2) {
+                const v = vertices[i];
+                const d = v.dist * 0.5;
+                ctx.moveTo(0, 0);
+                ctx.lineTo(Math.cos(v.angle) * d, Math.sin(v.angle) * d);
+            }
+            for (let i = 0; i < len; i += 2) {
+                const v1 = vertices[i], v2 = vertices[(i + 2) % len];
+                ctx.moveTo(Math.cos(v1.angle) * v1.dist * 0.5, Math.sin(v1.angle) * v1.dist * 0.5);
+                ctx.lineTo(Math.cos(v2.angle) * v2.dist * 0.5, Math.sin(v2.angle) * v2.dist * 0.5);
+            }
             ctx.stroke();
         }
 
@@ -1164,9 +1364,13 @@
                 const sy = rock.y - cam.y + canvas.height / 2;
                 if (sx < -60 || sx > canvas.width + 60 || sy < -60 || sy > canvas.height + 60) continue;
 
+                const resColor = rock.resourceType.color;
+                const resName = rock.resourceType.name;
+
                 ctx.save();
                 ctx.translate(sx, sy);
                 ctx.rotate(rock.rotation);
+
                 ctx.beginPath();
                 for (let i = 0; i < rock.vertices.length; i++) {
                     const v = rock.vertices[i];
@@ -1174,9 +1378,18 @@
                     ctx[method](Math.cos(v.angle) * v.dist, Math.sin(v.angle) * v.dist);
                 }
                 ctx.closePath();
-                ctx.strokeStyle = '#8b949e';
+                ctx.strokeStyle = resColor;
                 ctx.lineWidth = 1.5;
                 ctx.stroke();
+
+                ctx.strokeStyle = resColor;
+                ctx.lineWidth = 0.8;
+                ctx.globalAlpha = 0.5;
+                if (resName === 'copper') drawRockStripes(rock.radius);
+                else if (resName === 'platinum') drawRockDots(rock.radius);
+                else if (resName === 'crystal') drawRockVeins(rock.vertices);
+                ctx.globalAlpha = 1;
+
                 ctx.restore();
             }
         }
@@ -1271,6 +1484,197 @@
             }
         }
 
+        function drawShipHull(s) {
+            const level = gameState.upgrades.hull;
+            ctx.beginPath();
+            switch (level) {
+                case 0:
+                    ctx.moveTo(s, 0);
+                    ctx.lineTo(-s * 0.7, -s * 0.6);
+                    ctx.lineTo(-s * 0.4, 0);
+                    ctx.lineTo(-s * 0.7, s * 0.6);
+                    break;
+                case 1:
+                    ctx.moveTo(s, 0);
+                    ctx.lineTo(-s * 0.5, -s * 0.7);
+                    ctx.lineTo(-s * 0.7, -s * 0.7);
+                    ctx.lineTo(-s * 0.6, -s * 0.4);
+                    ctx.lineTo(-s * 0.4, 0);
+                    ctx.lineTo(-s * 0.6, s * 0.4);
+                    ctx.lineTo(-s * 0.7, s * 0.7);
+                    ctx.lineTo(-s * 0.5, s * 0.7);
+                    break;
+                case 2:
+                    ctx.moveTo(s, 0);
+                    ctx.lineTo(s * 0.3, -s * 0.4);
+                    ctx.lineTo(-s * 0.5, -s * 0.8);
+                    ctx.lineTo(-s * 0.8, -s * 0.6);
+                    ctx.lineTo(-s * 0.5, 0);
+                    ctx.lineTo(-s * 0.8, s * 0.6);
+                    ctx.lineTo(-s * 0.5, s * 0.8);
+                    ctx.lineTo(s * 0.3, s * 0.4);
+                    break;
+                case 3:
+                    ctx.moveTo(s * 1.1, 0);
+                    ctx.lineTo(s * 0.5, -s * 0.3);
+                    ctx.lineTo(s * 0.3, -s * 0.3);
+                    ctx.lineTo(-s * 0.4, -s * 0.9);
+                    ctx.lineTo(-s * 0.9, -s * 0.5);
+                    ctx.lineTo(-s * 0.5, 0);
+                    ctx.lineTo(-s * 0.9, s * 0.5);
+                    ctx.lineTo(-s * 0.4, s * 0.9);
+                    ctx.lineTo(s * 0.3, s * 0.3);
+                    ctx.lineTo(s * 0.5, s * 0.3);
+                    break;
+                case 4:
+                    ctx.moveTo(s * 1.2, 0);
+                    ctx.lineTo(s * 0.4, -s * 0.35);
+                    ctx.lineTo(-s * 0.2, -s * 0.5);
+                    ctx.lineTo(-s * 0.6, -s * 0.9);
+                    ctx.lineTo(-s * 1.0, -s * 0.6);
+                    ctx.lineTo(-s * 0.8, -s * 0.3);
+                    ctx.lineTo(-s * 0.6, 0);
+                    ctx.lineTo(-s * 0.8, s * 0.3);
+                    ctx.lineTo(-s * 1.0, s * 0.6);
+                    ctx.lineTo(-s * 0.6, s * 0.9);
+                    ctx.lineTo(-s * 0.2, s * 0.5);
+                    ctx.lineTo(s * 0.4, s * 0.35);
+                    break;
+                default:
+                    ctx.moveTo(s * 1.3, 0);
+                    ctx.lineTo(s * 0.7, -s * 0.2);
+                    ctx.lineTo(s * 0.5, -s * 0.45);
+                    ctx.lineTo(-s * 0.1, -s * 0.55);
+                    ctx.lineTo(-s * 0.5, -s * 1.0);
+                    ctx.lineTo(-s * 1.0, -s * 0.7);
+                    ctx.lineTo(-s * 0.8, -s * 0.35);
+                    ctx.lineTo(-s * 0.7, 0);
+                    ctx.lineTo(-s * 0.8, s * 0.35);
+                    ctx.lineTo(-s * 1.0, s * 0.7);
+                    ctx.lineTo(-s * 0.5, s * 1.0);
+                    ctx.lineTo(-s * 0.1, s * 0.55);
+                    ctx.lineTo(s * 0.5, s * 0.45);
+                    ctx.lineTo(s * 0.7, s * 0.2);
+                    break;
+            }
+            ctx.closePath();
+            ctx.strokeStyle = '#58a6ff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            if (level >= 3) {
+                ctx.beginPath();
+                ctx.moveTo(s * 0.4, -s * 0.15);
+                ctx.lineTo(-s * 0.2, -s * 0.3);
+                ctx.moveTo(s * 0.4, s * 0.15);
+                ctx.lineTo(-s * 0.2, s * 0.3);
+                ctx.strokeStyle = '#58a6ff';
+                ctx.lineWidth = 1;
+                ctx.globalAlpha = 0.4;
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        function drawUpgradeAddons(s) {
+            const u = gameState.upgrades;
+
+            if (u.fuel > 0) {
+                ctx.strokeStyle = '#f0883e';
+                ctx.lineWidth = 1;
+                const count = Math.ceil(u.fuel / 2);
+                for (let i = 0; i < count; i++) {
+                    const xOff = -s * 0.2 - i * s * 0.15;
+                    ctx.strokeRect(xOff - 2, -s * 0.7 - 3, 4, 5);
+                    ctx.strokeRect(xOff - 2, s * 0.7 - 2, 4, 5);
+                }
+            }
+
+            if (u.cargo > 0) {
+                ctx.strokeStyle = '#8b949e';
+                ctx.lineWidth = 1;
+                const ext = u.cargo * 0.06;
+                ctx.beginPath();
+                ctx.moveTo(-s * 0.5, -s * (0.5 + ext));
+                ctx.lineTo(-s * 0.7, -s * (0.5 + ext));
+                ctx.moveTo(-s * 0.5, s * (0.5 + ext));
+                ctx.lineTo(-s * 0.7, s * (0.5 + ext));
+                ctx.stroke();
+            }
+
+            if (u.speed > 0) {
+                ctx.strokeStyle = '#d2a8ff';
+                ctx.lineWidth = 0.7;
+                ctx.globalAlpha = 0.5;
+                ctx.beginPath();
+                for (let i = 0; i < Math.min(u.speed, 3); i++) {
+                    const yOff = (i - 1) * s * 0.12;
+                    ctx.moveTo(s * 0.6, yOff);
+                    ctx.lineTo(-s * 0.3, yOff);
+                }
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+
+            if (u.fireRate > 0) {
+                ctx.strokeStyle = '#f85149';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                if (u.fireRate >= 1) { ctx.moveTo(s * 0.8, -s * 0.15); ctx.lineTo(s * 1.1, -s * 0.15); }
+                if (u.fireRate >= 2) { ctx.moveTo(s * 0.8, s * 0.15); ctx.lineTo(s * 1.1, s * 0.15); }
+                if (u.fireRate >= 4) { ctx.moveTo(s * 0.9, -s * 0.3); ctx.lineTo(s * 1.15, -s * 0.3); }
+                ctx.stroke();
+            }
+
+            if (u.thrust > 0) {
+                ctx.strokeStyle = '#f0883e';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                const nw = s * 0.12 + u.thrust * s * 0.03;
+                ctx.moveTo(-s * 0.45, -nw); ctx.lineTo(-s * 0.55, -nw * 1.3);
+                ctx.moveTo(-s * 0.45, nw); ctx.lineTo(-s * 0.55, nw * 1.3);
+                if (u.thrust >= 3) {
+                    ctx.moveTo(-s * 0.6, -s * 0.35); ctx.lineTo(-s * 0.7, -s * 0.4);
+                    ctx.moveTo(-s * 0.6, s * 0.35); ctx.lineTo(-s * 0.7, s * 0.4);
+                }
+                ctx.stroke();
+            }
+
+            if (u.scanner > 0) {
+                ctx.strokeStyle = '#3fb950';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(s * 0.1, -s * 0.4);
+                ctx.lineTo(s * 0.1, -s * 0.7);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(s * 0.1, -s * 0.7, 3 + u.scanner, -Math.PI * 0.7, -Math.PI * 0.3);
+                ctx.stroke();
+            }
+
+            if (u.density > 0) {
+                ctx.strokeStyle = '#e3b341';
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                const dl = s * 0.2 + u.density * s * 0.05;
+                ctx.moveTo(s, 0); ctx.lineTo(s + dl, 0);
+                if (u.density >= 2) {
+                    ctx.moveTo(s + 2, -3); ctx.lineTo(s + dl * 0.5, 0); ctx.lineTo(s + 2, 3);
+                }
+                ctx.stroke();
+            }
+
+            if (u.magnet > 0) {
+                ctx.strokeStyle = '#58a6ff';
+                ctx.lineWidth = 1;
+                ctx.globalAlpha = 0.6;
+                ctx.beginPath();
+                ctx.arc(0, s * 0.5, s * 0.4 + u.magnet * 2, Math.PI * 0.2, Math.PI * 0.8);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+        }
+
         function drawShip() {
             const ship = gameState.ship;
             if (ship.invulnTimer > 0 && ship.invulnTimer !== Infinity && Math.floor(ship.invulnTimer * 10) % 2 === 0) return;
@@ -1282,15 +1686,8 @@
             ctx.translate(screenX, screenY);
             ctx.rotate(ship.angle);
 
-            ctx.beginPath();
-            ctx.moveTo(ship.size, 0);
-            ctx.lineTo(-ship.size * 0.7, -ship.size * 0.6);
-            ctx.lineTo(-ship.size * 0.4, 0);
-            ctx.lineTo(-ship.size * 0.7, ship.size * 0.6);
-            ctx.closePath();
-            ctx.strokeStyle = '#58a6ff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
+            drawShipHull(ship.size);
+            drawUpgradeAddons(ship.size);
 
             if (ship.thrust > 0 && ship.fuel > 0) {
                 const flameSize = ship.size * 0.5 * (0.7 + Math.random() * 0.3);
@@ -1317,7 +1714,7 @@
 
             ctx.fillStyle = '#484f58';
             ctx.textAlign = 'right';
-            ctx.fillText('v0.7', canvas.width - 14, 24);
+            ctx.fillText('v1.0', canvas.width - 14, 24);
             ctx.textAlign = 'left';
 
             ctx.fillStyle = '#8b949e';
