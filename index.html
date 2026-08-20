@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Asteroids Miner</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #0d1117;
+            touch-action: none;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        #pause-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(13, 17, 23, 0.85);
+            z-index: 100;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        #pause-overlay.visible {
+            display: flex;
+        }
+        #pause-overlay h1 {
+            font-family: 'Courier New', monospace;
+            color: #58a6ff;
+            font-size: 3rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+        }
+        #pause-overlay p {
+            font-family: 'Courier New', monospace;
+            color: #8b949e;
+            font-size: 1.2rem;
+        }
+        .pause-btn {
+            font-family: 'Courier New', monospace;
+            font-size: 1.1rem;
+            padding: 12px 32px;
+            background: transparent;
+            border: 2px solid #58a6ff;
+            color: #58a6ff;
+            cursor: pointer;
+            letter-spacing: 2px;
+            transition: background 0.2s, color 0.2s;
+        }
+        .pause-btn:hover {
+            background: #58a6ff;
+            color: #0d1117;
+        }
+        #pause-button {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 50;
+            width: 44px;
+            height: 44px;
+            background: transparent;
+            border: 2px solid #8b949e;
+            color: #8b949e;
+            font-size: 1.4rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+        #joystick-zone {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 50%;
+            height: 100%;
+            z-index: 50;
+        }
+        #fire-button {
+            display: none;
+            position: fixed;
+            bottom: 40px;
+            right: 40px;
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: transparent;
+            border: 3px solid #f85149;
+            color: #f85149;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            font-weight: bold;
+            z-index: 50;
+            cursor: pointer;
+        }
+        #rotate-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0d1117;
+            z-index: 200;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+        }
+        #rotate-overlay span {
+            font-size: 3rem;
+        }
+        #rotate-overlay p {
+            font-family: 'Courier New', monospace;
+            color: #8b949e;
+            font-size: 1rem;
+        }
+        @media (orientation: portrait) and (hover: none) and (pointer: coarse) {
+            #rotate-overlay { display: flex; }
+        }
+        .settings-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 12px;
+            align-items: center;
+        }
+        .settings-group label {
+            font-family: 'Courier New', monospace;
+            color: #8b949e;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .settings-row {
+            display: flex;
+            gap: 8px;
+        }
+        .settings-row button {
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            padding: 6px 14px;
+            background: transparent;
+            border: 1px solid #8b949e;
+            color: #8b949e;
+            cursor: pointer;
+            letter-spacing: 1px;
+            transition: border-color 0.2s, color 0.2s;
+        }
+        .settings-row button.active {
+            border-color: #58a6ff;
+            color: #58a6ff;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="game-canvas"></canvas>
+    <button id="pause-button">&#10074;&#10074;</button>
+    <div id="pause-overlay">
+        <h1>Paused</h1>
+        <p>Asteroids Miner</p>
+        <div class="settings-group" id="mobile-settings" style="display:none">
+            <label>Joystick Side</label>
+            <div class="settings-row" id="joystick-side-btns">
+                <button data-value="left" class="active">Left</button>
+                <button data-value="right">Right</button>
+            </div>
+            <label>Joystick Mode</label>
+            <div class="settings-row" id="joystick-mode-btns">
+                <button data-value="static" class="active">Fixed</button>
+                <button data-value="semi">Semi</button>
+                <button data-value="dynamic">Float</button>
+            </div>
+        </div>
+        <button class="pause-btn" id="resume-btn">Resume</button>
+    </div>
+    <div id="rotate-overlay">
+        <span>&#x21BB;</span>
+        <p>Rotate to landscape</p>
+    </div>
+    <div id="joystick-zone"></div>
+    <button id="fire-button">FIRE</button>
+
+    <script src="https://unpkg.com/nipplejs@0.10.2/dist/nipplejs.min.js"></script>
+    <script>
+    (function() {
+        'use strict';
+
+        // --- Canvas setup ---
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- Game state ---
+        const gameState = {
+            paused: false,
+            ship: {
+                x: 0,
+                y: 0,
+                angle: -Math.PI / 2,
+                vx: 0,
+                vy: 0,
+                thrust: 0,
+                rotationSpeed: 0,
+                size: 18
+            },
+            camera: { x: 0, y: 0 },
+            stars: [],
+            keys: {},
+            joystick: { active: false, angle: 0, force: 0 },
+            isMobile: false,
+            lastTime: 0,
+            settings: {
+                joystickSide: 'left',
+                joystickMode: 'static'
+            }
+        };
+
+        // --- Constants ---
+        const SHIP_ACCEL = 400;
+        const SHIP_MAX_SPEED = 350;
+        const SHIP_ROTATION_SPEED = 4.5;
+        const SHIP_DRAG = 0.98;
+        const STAR_COUNT = 200;
+        const STAR_FIELD_SIZE = 2000;
+
+        // --- Stars (parallax background) ---
+        function generateStars() {
+            gameState.stars = [];
+            for (let i = 0; i < STAR_COUNT; i++) {
+                gameState.stars.push({
+                    x: (Math.random() - 0.5) * STAR_FIELD_SIZE,
+                    y: (Math.random() - 0.5) * STAR_FIELD_SIZE,
+                    size: Math.random() * 1.5 + 0.5,
+                    brightness: Math.random() * 0.5 + 0.3,
+                    layer: Math.random() < 0.3 ? 0.3 : Math.random() < 0.6 ? 0.6 : 1
+                });
+            }
+        }
+        generateStars();
+
+        // --- Mobile detection ---
+        function detectMobile() {
+            gameState.isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+            if (gameState.isMobile) {
+                document.getElementById('fire-button').style.display = 'flex';
+                document.getElementById('mobile-settings').style.display = 'flex';
+                try { screen.orientation.lock('landscape'); } catch(e) {}
+                loadSettings();
+                setupJoystick();
+            }
+        }
+
+        // --- Settings persistence ---
+        function loadSettings() {
+            try {
+                const saved = localStorage.getItem('asteroids-settings');
+                if (saved) Object.assign(gameState.settings, JSON.parse(saved));
+            } catch(e) {}
+            syncSettingsUI();
+        }
+
+        function saveSettings() {
+            try { localStorage.setItem('asteroids-settings', JSON.stringify(gameState.settings)); } catch(e) {}
+        }
+
+        function syncSettingsUI() {
+            document.querySelectorAll('#joystick-side-btns button').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.value === gameState.settings.joystickSide);
+            });
+            document.querySelectorAll('#joystick-mode-btns button').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.value === gameState.settings.joystickMode);
+            });
+        }
+
+        // --- Joystick setup ---
+        let joystickManager = null;
+        function setupJoystick() {
+            if (typeof nipplejs === 'undefined') return;
+            if (joystickManager) { joystickManager.destroy(); joystickManager = null; }
+
+            const zone = document.getElementById('joystick-zone');
+            const side = gameState.settings.joystickSide;
+            const mode = gameState.settings.joystickMode;
+
+            zone.style.left = side === 'left' ? '0' : 'auto';
+            zone.style.right = side === 'right' ? '0' : 'auto';
+
+            const fireBtn = document.getElementById('fire-button');
+            fireBtn.style.left = side === 'right' ? '40px' : 'auto';
+            fireBtn.style.right = side === 'left' ? '40px' : 'auto';
+
+            const opts = {
+                zone: zone,
+                mode: mode,
+                color: '#58a6ff',
+                size: 120
+            };
+
+            if (mode === 'static') {
+                const posX = side === 'left' ? '100px' : 'calc(100% - 100px)';
+                opts.position = { left: side === 'left' ? '100px' : undefined, right: side === 'right' ? '100px' : undefined, bottom: '100px' };
+                if (side === 'left') { opts.position = { left: '100px', bottom: '100px' }; }
+                else { opts.position = { right: '100px', bottom: '100px' }; }
+            }
+
+            if (mode === 'semi') {
+                opts.catchDistance = 150;
+            }
+
+            joystickManager = nipplejs.create(opts);
+
+            joystickManager.on('move', function(evt, data) {
+                gameState.joystick.active = true;
+                gameState.joystick.angle = data.angle.radian;
+                gameState.joystick.force = Math.min(data.force / 2, 1);
+            });
+
+            joystickManager.on('end', function() {
+                gameState.joystick.active = false;
+                gameState.joystick.force = 0;
+            });
+        }
+
+        // --- Input handling ---
+        window.addEventListener('keydown', (e) => {
+            gameState.keys[e.code] = true;
+            if (e.code === 'Escape') togglePause();
+        });
+        window.addEventListener('keyup', (e) => {
+            gameState.keys[e.code] = false;
+        });
+
+        // Pause controls
+        document.getElementById('pause-button').addEventListener('click', togglePause);
+        document.getElementById('resume-btn').addEventListener('click', togglePause);
+
+        // Settings controls
+        document.getElementById('joystick-side-btns').addEventListener('click', function(e) {
+            if (!e.target.dataset.value) return;
+            gameState.settings.joystickSide = e.target.dataset.value;
+            saveSettings();
+            syncSettingsUI();
+            setupJoystick();
+        });
+        document.getElementById('joystick-mode-btns').addEventListener('click', function(e) {
+            if (!e.target.dataset.value) return;
+            gameState.settings.joystickMode = e.target.dataset.value;
+            saveSettings();
+            syncSettingsUI();
+            setupJoystick();
+        });
+
+        function togglePause() {
+            gameState.paused = !gameState.paused;
+            const overlay = document.getElementById('pause-overlay');
+            if (gameState.paused) {
+                overlay.classList.add('visible');
+            } else {
+                overlay.classList.remove('visible');
+                gameState.lastTime = performance.now();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // --- Update ---
+        function updateShip(dt) {
+            const ship = gameState.ship;
+
+            if (gameState.isMobile && gameState.joystick.active) {
+                // Joystick: angle directly sets ship angle, force sets thrust
+                ship.angle = -gameState.joystick.angle + Math.PI / 2;
+                ship.thrust = gameState.joystick.force;
+            } else {
+                // Keyboard rotation
+                let rotating = 0;
+                if (gameState.keys['ArrowLeft'] || gameState.keys['KeyA']) rotating -= 1;
+                if (gameState.keys['ArrowRight'] || gameState.keys['KeyD']) rotating += 1;
+                ship.angle += rotating * SHIP_ROTATION_SPEED * dt;
+
+                // Keyboard thrust
+                ship.thrust = 0;
+                if (gameState.keys['ArrowUp'] || gameState.keys['KeyW']) ship.thrust = 1;
+            }
+
+            // Apply thrust
+            if (ship.thrust > 0) {
+                ship.vx += Math.cos(ship.angle) * SHIP_ACCEL * ship.thrust * dt;
+                ship.vy += Math.sin(ship.angle) * SHIP_ACCEL * ship.thrust * dt;
+            }
+
+            // Clamp speed
+            const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
+            if (speed > SHIP_MAX_SPEED) {
+                ship.vx = (ship.vx / speed) * SHIP_MAX_SPEED;
+                ship.vy = (ship.vy / speed) * SHIP_MAX_SPEED;
+            }
+
+            // Drag
+            ship.vx *= SHIP_DRAG;
+            ship.vy *= SHIP_DRAG;
+
+            // Move
+            ship.x += ship.vx * dt;
+            ship.y += ship.vy * dt;
+
+            // Camera follows ship
+            gameState.camera.x = ship.x;
+            gameState.camera.y = ship.y;
+        }
+
+        // --- Rendering ---
+        function drawStars() {
+            const cam = gameState.camera;
+            for (const star of gameState.stars) {
+                const parallax = star.layer;
+                let sx = (star.x - cam.x * parallax) % STAR_FIELD_SIZE;
+                let sy = (star.y - cam.y * parallax) % STAR_FIELD_SIZE;
+
+                // Wrap stars
+                const hw = canvas.width / 2;
+                const hh = canvas.height / 2;
+                if (sx < -hw) sx += STAR_FIELD_SIZE;
+                if (sx > hw) sx -= STAR_FIELD_SIZE;
+                if (sy < -hh) sy += STAR_FIELD_SIZE;
+                if (sy > hh) sy -= STAR_FIELD_SIZE;
+
+                const screenX = sx + hw;
+                const screenY = sy + hh;
+
+                if (screenX >= 0 && screenX <= canvas.width && screenY >= 0 && screenY <= canvas.height) {
+                    ctx.fillStyle = `rgba(255, 255, 255, ${star.brightness})`;
+                    ctx.fillRect(screenX, screenY, star.size, star.size);
+                }
+            }
+        }
+
+        function drawShip() {
+            const ship = gameState.ship;
+            const screenX = canvas.width / 2;
+            const screenY = canvas.height / 2;
+
+            ctx.save();
+            ctx.translate(screenX, screenY);
+            ctx.rotate(ship.angle);
+
+            // Ship body (triangle)
+            ctx.beginPath();
+            ctx.moveTo(ship.size, 0);
+            ctx.lineTo(-ship.size * 0.7, -ship.size * 0.6);
+            ctx.lineTo(-ship.size * 0.4, 0);
+            ctx.lineTo(-ship.size * 0.7, ship.size * 0.6);
+            ctx.closePath();
+            ctx.strokeStyle = '#58a6ff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Thrust flame
+            if (ship.thrust > 0) {
+                const flameSize = ship.size * 0.5 * (0.7 + Math.random() * 0.3);
+                ctx.beginPath();
+                ctx.moveTo(-ship.size * 0.4, -ship.size * 0.2);
+                ctx.lineTo(-ship.size * 0.4 - flameSize, 0);
+                ctx.lineTo(-ship.size * 0.4, ship.size * 0.2);
+                ctx.strokeStyle = '#f0883e';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        function drawHUD() {
+            const ship = gameState.ship;
+            const dist = Math.sqrt(ship.x * ship.x + ship.y * ship.y);
+
+            ctx.font = '14px Courier New';
+            ctx.fillStyle = '#8b949e';
+            ctx.textAlign = 'left';
+            ctx.fillText(`DIST: ${Math.floor(dist)}`, 16, 30);
+            ctx.fillText(`VEL: ${Math.floor(Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy))}`, 16, 50);
+
+            // Home direction indicator
+            if (dist > 50) {
+                const homeAngle = Math.atan2(-ship.y, -ship.x);
+                const indicatorDist = 60;
+                const ix = canvas.width / 2 + Math.cos(homeAngle) * indicatorDist;
+                const iy = canvas.height / 2 + Math.sin(homeAngle) * indicatorDist;
+
+                ctx.beginPath();
+                ctx.arc(ix, iy, 4, 0, Math.PI * 2);
+                ctx.fillStyle = '#3fb950';
+                ctx.fill();
+
+                ctx.font = '10px Courier New';
+                ctx.fillStyle = '#3fb950';
+                ctx.textAlign = 'center';
+                ctx.fillText('HOME', ix, iy + 14);
+            }
+        }
+
+        // --- Game loop ---
+        function gameLoop(timestamp) {
+            if (gameState.paused) return;
+
+            const dt = Math.min((timestamp - gameState.lastTime) / 1000, 0.05);
+            gameState.lastTime = timestamp;
+
+            // Update
+            updateShip(dt);
+
+            // Render
+            ctx.fillStyle = '#0d1117';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawStars();
+            drawShip();
+            drawHUD();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- Start ---
+        try { detectMobile(); } catch(e) { console.warn('Mobile init failed:', e); }
+
+        // Render first frame synchronously so the ship is visible immediately
+        ctx.fillStyle = '#0d1117';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        drawStars();
+        drawShip();
+        drawHUD();
+
+        gameState.lastTime = performance.now();
+        requestAnimationFrame(gameLoop);
+    })();
+    </script>
+</body>
+</html>

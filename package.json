@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "name": "asteroids-miner",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "test:visual": "node tests/visual.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.52.0"
+  }
+}
