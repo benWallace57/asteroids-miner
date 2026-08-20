@@ -119,6 +119,17 @@
             z-index: 50;
             cursor: pointer;
         }
+        #dock-button {
+            display: none;
+            position: fixed;
+            bottom: 50%;
+            left: 50%;
+            transform: translate(-50%, 50%);
+            z-index: 60;
+            font-size: 1.2rem;
+            padding: 12px 32px;
+        }
+        #dock-button.visible { display: block; }
         #rotate-overlay {
             display: none;
             position: fixed;
@@ -223,6 +234,7 @@
         <span>&#x21BB;</span>
         <p>Rotate to landscape</p>
     </div>
+    <button id="dock-button" class="btn btn-sell">DOCK</button>
     <div id="joystick-zone"></div>
     <button id="fire-button">FIRE</button>
 
@@ -487,6 +499,17 @@
             }
         }
 
+        // --- Docking ---
+        document.getElementById('dock-button').addEventListener('click', function() {
+            const ship = gameState.ship;
+            gameState.docked = true;
+            ship.fuel = ship.maxFuel;
+            ship.hull = ship.maxHull;
+            ship.vx = 0; ship.vy = 0;
+            document.getElementById('dock-button').classList.remove('visible');
+            openShop();
+        });
+
         // --- Shop ---
         document.getElementById('sell-btn').addEventListener('click', sellCargo);
         document.getElementById('undock-btn').addEventListener('click', closeShop);
@@ -705,11 +728,17 @@
                 ship.angle = -gameState.joystick.angle;
                 ship.thrust = gameState.joystick.force;
             } else if (!gameState.isMobile) {
-                let rotating = 0;
-                if (gameState.keys['ArrowLeft'] || gameState.keys['KeyA']) rotating -= 1;
-                if (gameState.keys['ArrowRight'] || gameState.keys['KeyD']) rotating += 1;
-                ship.angle += rotating * 4.5 * dt;
-                ship.thrust = (gameState.keys['ArrowUp'] || gameState.keys['KeyW']) ? 1 : 0;
+                let mx = 0, my = 0;
+                if (gameState.keys['ArrowLeft'] || gameState.keys['KeyA']) mx -= 1;
+                if (gameState.keys['ArrowRight'] || gameState.keys['KeyD']) mx += 1;
+                if (gameState.keys['ArrowUp'] || gameState.keys['KeyW']) my -= 1;
+                if (gameState.keys['ArrowDown'] || gameState.keys['KeyS']) my += 1;
+                if (mx !== 0 || my !== 0) {
+                    ship.angle = Math.atan2(my, mx);
+                    ship.thrust = 1;
+                } else {
+                    ship.thrust = 0;
+                }
             } else {
                 ship.thrust = 0;
             }
@@ -931,15 +960,14 @@
             const base = gameState.base;
             const dx = ship.x - base.x, dy = ship.y - base.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
-            const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
 
-            if (dist < base.radius && speed < BASE_DOCK_SPEED && !gameState.docked && !gameState.shopOpen) {
-                gameState.docked = true;
-                ship.fuel = ship.maxFuel;
-                ship.hull = ship.maxHull;
-                openShop();
+            const dockBtn = document.getElementById('dock-button');
+            if (dist < base.radius * 1.5 && !gameState.docked && !gameState.shopOpen) {
+                dockBtn.classList.add('visible');
+            } else {
+                dockBtn.classList.remove('visible');
             }
-            if (dist > base.radius * 2) {
+            if (dist > base.radius * 2.5) {
                 gameState.docked = false;
             }
         }
