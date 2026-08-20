@@ -22,7 +22,7 @@
             width: 100%;
             height: 100%;
         }
-        #pause-overlay {
+        #pause-overlay, #shop-overlay, #death-overlay {
             display: none;
             position: fixed;
             top: 0;
@@ -34,27 +34,30 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 20px;
+            gap: 16px;
+            overflow-y: auto;
+            padding: 20px;
         }
-        #pause-overlay.visible {
+        #pause-overlay.visible, #shop-overlay.visible, #death-overlay.visible {
             display: flex;
         }
-        #pause-overlay h1 {
+        #pause-overlay h1, #shop-overlay h1, #death-overlay h1 {
             font-family: 'Courier New', monospace;
             color: #58a6ff;
-            font-size: 3rem;
+            font-size: 2.5rem;
             letter-spacing: 4px;
             text-transform: uppercase;
         }
-        #pause-overlay p {
+        #death-overlay h1 { color: #f85149; }
+        #pause-overlay p, #shop-overlay p, #death-overlay p {
             font-family: 'Courier New', monospace;
             color: #8b949e;
-            font-size: 1.2rem;
+            font-size: 1rem;
         }
-        .pause-btn {
+        .btn {
             font-family: 'Courier New', monospace;
-            font-size: 1.1rem;
-            padding: 12px 32px;
+            font-size: 1rem;
+            padding: 10px 28px;
             background: transparent;
             border: 2px solid #58a6ff;
             color: #58a6ff;
@@ -62,10 +65,11 @@
             letter-spacing: 2px;
             transition: background 0.2s, color 0.2s;
         }
-        .pause-btn:hover {
-            background: #58a6ff;
-            color: #0d1117;
-        }
+        .btn:hover { background: #58a6ff; color: #0d1117; }
+        .btn:disabled { opacity: 0.3; cursor: default; border-color: #8b949e; color: #8b949e; }
+        .btn:disabled:hover { background: transparent; color: #8b949e; }
+        .btn-sell { border-color: #3fb950; color: #3fb950; }
+        .btn-sell:hover { background: #3fb950; color: #0d1117; }
         #pause-button {
             position: fixed;
             top: 16px;
@@ -111,10 +115,7 @@
         #rotate-overlay {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0; width: 100%; height: 100%;
             background: #0d1117;
             z-index: 200;
             flex-direction: column;
@@ -122,14 +123,8 @@
             justify-content: center;
             gap: 16px;
         }
-        #rotate-overlay span {
-            font-size: 3rem;
-        }
-        #rotate-overlay p {
-            font-family: 'Courier New', monospace;
-            color: #8b949e;
-            font-size: 1rem;
-        }
+        #rotate-overlay span { font-size: 3rem; }
+        #rotate-overlay p { font-family: 'Courier New', monospace; color: #8b949e; font-size: 1rem; }
         @media (orientation: portrait) and (hover: none) and (pointer: coarse) {
             #rotate-overlay { display: flex; }
         }
@@ -137,13 +132,13 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
-            margin-top: 12px;
+            margin-top: 8px;
             align-items: center;
         }
         .settings-group label {
             font-family: 'Courier New', monospace;
             color: #8b949e;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             letter-spacing: 1px;
             text-transform: uppercase;
         }
@@ -153,19 +148,34 @@
         }
         .settings-row button {
             font-family: 'Courier New', monospace;
-            font-size: 0.8rem;
-            padding: 6px 14px;
+            font-size: 0.75rem;
+            padding: 5px 12px;
             background: transparent;
             border: 1px solid #8b949e;
             color: #8b949e;
             cursor: pointer;
             letter-spacing: 1px;
-            transition: border-color 0.2s, color 0.2s;
         }
-        .settings-row button.active {
-            border-color: #58a6ff;
-            color: #58a6ff;
+        .settings-row button.active { border-color: #58a6ff; color: #58a6ff; }
+        .shop-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+            max-width: 400px;
         }
+        .upgrade-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: #8b949e;
+        }
+        .upgrade-name { color: #c9d1d9; min-width: 80px; }
+        .upgrade-pips { letter-spacing: 2px; }
+        .upgrade-cost { color: #3fb950; min-width: 50px; text-align: right; }
     </style>
 </head>
 <body>
@@ -187,7 +197,20 @@
                 <button data-value="dynamic">Float</button>
             </div>
         </div>
-        <button class="pause-btn" id="resume-btn">Resume</button>
+        <button class="btn" id="resume-btn">Resume</button>
+    </div>
+    <div id="shop-overlay">
+        <h1>Home Base</h1>
+        <p id="shop-credits">CREDITS: 0</p>
+        <p id="shop-cargo">CARGO: 0/8</p>
+        <button class="btn btn-sell" id="sell-btn">SELL ALL</button>
+        <div class="shop-section" id="shop-upgrades"></div>
+        <button class="btn" id="undock-btn">UNDOCK</button>
+    </div>
+    <div id="death-overlay">
+        <h1>Destroyed</h1>
+        <p id="death-msg">Cargo lost. Hull downgraded.</p>
+        <button class="btn" id="respawn-btn">RESPAWN</button>
     </div>
     <div id="rotate-overlay">
         <span>&#x21BB;</span>
@@ -201,7 +224,6 @@
     (function() {
         'use strict';
 
-        // --- Canvas setup ---
         const canvas = document.getElementById('game-canvas');
         const ctx = canvas.getContext('2d');
 
@@ -212,40 +234,130 @@
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
 
-        // --- Game state ---
-        const gameState = {
-            paused: false,
-            ship: {
-                x: 0,
-                y: 0,
-                angle: -Math.PI / 2,
-                vx: 0,
-                vy: 0,
-                thrust: 0,
-                rotationSpeed: 0,
-                size: 18
-            },
-            camera: { x: 0, y: 0 },
-            stars: [],
-            keys: {},
-            joystick: { active: false, angle: 0, force: 0 },
-            isMobile: false,
-            lastTime: 0,
-            settings: {
-                joystickSide: 'left',
-                joystickMode: 'static'
-            }
-        };
-
         // --- Constants ---
         const SHIP_ACCEL = 400;
         const SHIP_MAX_SPEED = 350;
-        const SHIP_ROTATION_SPEED = 4.5;
         const SHIP_DRAG = 0.98;
+        const SHIP_SIZE = 18;
+        const BULLET_SPEED = 600;
+        const BULLET_LIFETIME = 1.2;
+        const BULLET_LENGTH = 12;
+        const FIRE_RATE_BASE = 0.25;
+        const AUTOAIM_RANGE = 400;
+        const ROCK_ACTIVE_RADIUS = 1200;
+        const ROCK_DESPAWN_RADIUS = 1500;
+        const ROCK_BASE_DENSITY = 6;
+        const ROCK_MAX_COUNT = 30;
+        const ROCK_DRIFT_BASE = 30;
+        const RESOURCE_COLLECT_RADIUS = 35;
+        const RESOURCE_LIFETIME = 30;
+        const FUEL_DRAIN_RATE = 8;
+        const COLLISION_DAMAGE = 1;
+        const INVULN_TIME = 1.5;
+        const BASE_DOCK_RADIUS = 60;
+        const BASE_DOCK_SPEED = 40;
+        const BASE_SAFE_RADIUS = 300;
+        const UPGRADE_COSTS = [10, 30, 75, 150, 300];
         const STAR_COUNT = 200;
         const STAR_FIELD_SIZE = 2000;
+        const PARTICLE_MAX = 120;
 
-        // --- Stars (parallax background) ---
+        const ROCK_TIERS = {
+            large:  { radius: 40, hp: 3, children: 2, childTier: 'medium' },
+            medium: { radius: 24, hp: 2, children: 2, childTier: 'small' },
+            small:  { radius: 14, hp: 1, children: 0, childTier: null }
+        };
+
+        const RESOURCE_TYPES = [
+            { name: 'iron',     color: '#8b949e', minDist: 0,    value: 1 },
+            { name: 'copper',   color: '#f0883e', minDist: 500,  value: 3 },
+            { name: 'gold',     color: '#d2a8ff', minDist: 1500, value: 8 },
+            { name: 'platinum', color: '#58a6ff', minDist: 3000, value: 20 },
+            { name: 'crystal',  color: '#3fb950', minDist: 5000, value: 50 }
+        ];
+
+        const UPGRADE_DEFS = [
+            { key: 'hull',     label: 'HULL',      desc: '+1 max HP' },
+            { key: 'fuel',     label: 'FUEL',      desc: '+25 tank' },
+            { key: 'cargo',    label: 'CARGO',     desc: '+4 slots' },
+            { key: 'speed',    label: 'SPEED',     desc: '+50 max' },
+            { key: 'fireRate', label: 'FIRE RATE', desc: 'faster' },
+            { key: 'thrust',   label: 'THRUST',    desc: '+100 accel' }
+        ];
+
+        // --- Game State ---
+        const gameState = {
+            paused: false,
+            shopOpen: false,
+            dead: false,
+            ship: {
+                x: 0, y: 0,
+                angle: -Math.PI / 2,
+                vx: 0, vy: 0,
+                thrust: 0,
+                size: SHIP_SIZE,
+                hull: 3, maxHull: 3,
+                fuel: 100, maxFuel: 100,
+                cargo: [], maxCargo: 8,
+                fireTimer: 0,
+                invulnTimer: 0
+            },
+            camera: { x: 0, y: 0 },
+            base: { x: 0, y: 0, radius: BASE_DOCK_RADIUS, pulse: 0 },
+            bullets: [],
+            rocks: [],
+            particles: [],
+            resources: [],
+            stars: [],
+            keys: {},
+            mouse: { x: 0, y: 0, down: false },
+            joystick: { active: false, angle: 0, force: 0 },
+            isMobile: false,
+            lastTime: 0,
+            credits: 0,
+            upgrades: { hull: 0, fuel: 0, cargo: 0, speed: 0, fireRate: 0, thrust: 0 },
+            derived: { maxSpeed: SHIP_MAX_SPEED, fireRate: FIRE_RATE_BASE, accel: SHIP_ACCEL },
+            settings: { joystickSide: 'left', joystickMode: 'static' },
+            docked: true,
+            cargoFullFlash: 0
+        };
+
+        function applyUpgrades() {
+            const u = gameState.upgrades;
+            const ship = gameState.ship;
+            ship.maxHull = 3 + u.hull;
+            ship.maxFuel = 100 + u.fuel * 25;
+            ship.maxCargo = 8 + u.cargo * 4;
+            gameState.derived = {
+                maxSpeed: SHIP_MAX_SPEED + u.speed * 50,
+                fireRate: FIRE_RATE_BASE * Math.pow(0.8, u.fireRate),
+                accel: SHIP_ACCEL + u.thrust * 100
+            };
+        }
+
+        function saveGame() {
+            try {
+                localStorage.setItem('asteroids-save', JSON.stringify({
+                    upgrades: gameState.upgrades,
+                    credits: gameState.credits
+                }));
+            } catch(e) {}
+        }
+
+        function loadGame() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('asteroids-save'));
+                if (saved) {
+                    Object.assign(gameState.upgrades, saved.upgrades);
+                    gameState.credits = saved.credits || 0;
+                    applyUpgrades();
+                    gameState.ship.hull = gameState.ship.maxHull;
+                    gameState.ship.fuel = gameState.ship.maxFuel;
+                }
+            } catch(e) {}
+        }
+
+        // --- Stars ---
         function generateStars() {
             gameState.stars = [];
             for (let i = 0; i < STAR_COUNT; i++) {
@@ -260,7 +372,7 @@
         }
         generateStars();
 
-        // --- Mobile detection ---
+        // --- Mobile ---
         function detectMobile() {
             gameState.isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
             if (gameState.isMobile) {
@@ -272,7 +384,6 @@
             }
         }
 
-        // --- Settings persistence ---
         function loadSettings() {
             try {
                 const saved = localStorage.getItem('asteroids-settings');
@@ -294,7 +405,6 @@
             });
         }
 
-        // --- Joystick setup ---
         let joystickManager = null;
         function setupJoystick() {
             if (typeof nipplejs === 'undefined') return;
@@ -311,153 +421,660 @@
             fireBtn.style.left = side === 'right' ? '40px' : 'auto';
             fireBtn.style.right = side === 'left' ? '40px' : 'auto';
 
-            const opts = {
-                zone: zone,
-                mode: mode,
-                color: '#58a6ff',
-                size: 120
-            };
-
+            const opts = { zone, mode, color: '#58a6ff', size: 120 };
             if (mode === 'static') {
-                const posX = side === 'left' ? '100px' : 'calc(100% - 100px)';
-                opts.position = { left: side === 'left' ? '100px' : undefined, right: side === 'right' ? '100px' : undefined, bottom: '100px' };
-                if (side === 'left') { opts.position = { left: '100px', bottom: '100px' }; }
-                else { opts.position = { right: '100px', bottom: '100px' }; }
+                opts.position = side === 'left' ? { left: '100px', bottom: '100px' } : { right: '100px', bottom: '100px' };
             }
-
-            if (mode === 'semi') {
-                opts.catchDistance = 150;
-            }
+            if (mode === 'semi') opts.catchDistance = 150;
 
             joystickManager = nipplejs.create(opts);
-
             joystickManager.on('move', function(evt, data) {
                 gameState.joystick.active = true;
                 gameState.joystick.angle = data.angle.radian;
                 gameState.joystick.force = Math.min(data.force / 2, 1);
             });
-
             joystickManager.on('end', function() {
                 gameState.joystick.active = false;
                 gameState.joystick.force = 0;
             });
         }
 
-        // --- Input handling ---
+        // --- Input ---
         window.addEventListener('keydown', (e) => {
             gameState.keys[e.code] = true;
             if (e.code === 'Escape') togglePause();
         });
-        window.addEventListener('keyup', (e) => {
-            gameState.keys[e.code] = false;
+        window.addEventListener('keyup', (e) => { gameState.keys[e.code] = false; });
+        canvas.addEventListener('mousemove', (e) => {
+            gameState.mouse.x = e.clientX;
+            gameState.mouse.y = e.clientY;
         });
+        canvas.addEventListener('mousedown', () => { gameState.mouse.down = true; });
+        canvas.addEventListener('mouseup', () => { gameState.mouse.down = false; });
 
-        // Pause controls
         document.getElementById('pause-button').addEventListener('click', togglePause);
         document.getElementById('resume-btn').addEventListener('click', togglePause);
-
-        // Settings controls
         document.getElementById('joystick-side-btns').addEventListener('click', function(e) {
             if (!e.target.dataset.value) return;
             gameState.settings.joystickSide = e.target.dataset.value;
-            saveSettings();
-            syncSettingsUI();
-            setupJoystick();
+            saveSettings(); syncSettingsUI(); setupJoystick();
         });
         document.getElementById('joystick-mode-btns').addEventListener('click', function(e) {
             if (!e.target.dataset.value) return;
             gameState.settings.joystickMode = e.target.dataset.value;
-            saveSettings();
-            syncSettingsUI();
-            setupJoystick();
+            saveSettings(); syncSettingsUI(); setupJoystick();
         });
 
+        let fireButtonDown = false;
+        const fireBtn = document.getElementById('fire-button');
+        fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); fireButtonDown = true; });
+        fireBtn.addEventListener('touchend', () => { fireButtonDown = false; });
+
         function togglePause() {
+            if (gameState.shopOpen || gameState.dead) return;
             gameState.paused = !gameState.paused;
-            const overlay = document.getElementById('pause-overlay');
-            if (gameState.paused) {
-                overlay.classList.add('visible');
-            } else {
-                overlay.classList.remove('visible');
+            document.getElementById('pause-overlay').classList.toggle('visible', gameState.paused);
+            if (!gameState.paused) {
                 gameState.lastTime = performance.now();
                 requestAnimationFrame(gameLoop);
             }
         }
 
-        // --- Update ---
+        // --- Shop ---
+        document.getElementById('sell-btn').addEventListener('click', sellCargo);
+        document.getElementById('undock-btn').addEventListener('click', closeShop);
+
+        function openShop() {
+            gameState.shopOpen = true;
+            updateShopUI();
+            document.getElementById('shop-overlay').classList.add('visible');
+        }
+
+        function closeShop() {
+            gameState.shopOpen = false;
+            gameState.docked = false;
+            document.getElementById('shop-overlay').classList.remove('visible');
+            gameState.ship.vx = Math.cos(gameState.ship.angle) * 60;
+            gameState.ship.vy = Math.sin(gameState.ship.angle) * 60;
+            gameState.lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function sellCargo() {
+            const ship = gameState.ship;
+            let earned = 0;
+            ship.cargo.forEach(item => { earned += item.value; });
+            gameState.credits += earned;
+            ship.cargo = [];
+            saveGame();
+            updateShopUI();
+        }
+
+        function buyUpgrade(key) {
+            const level = gameState.upgrades[key];
+            if (level >= 5) return;
+            const cost = UPGRADE_COSTS[level];
+            if (gameState.credits < cost) return;
+            gameState.credits -= cost;
+            gameState.upgrades[key]++;
+            applyUpgrades();
+            gameState.ship.hull = Math.min(gameState.ship.hull + (key === 'hull' ? 1 : 0), gameState.ship.maxHull);
+            gameState.ship.fuel = gameState.ship.maxFuel;
+            saveGame();
+            updateShopUI();
+        }
+
+        function updateShopUI() {
+            const ship = gameState.ship;
+            document.getElementById('shop-credits').textContent = `CREDITS: ${gameState.credits}`;
+            document.getElementById('shop-cargo').textContent = `CARGO: ${ship.cargo.length}/${ship.maxCargo}`;
+            const sellVal = ship.cargo.reduce((s, i) => s + i.value, 0);
+            document.getElementById('sell-btn').textContent = `SELL ALL (${sellVal}cr)`;
+            document.getElementById('sell-btn').disabled = ship.cargo.length === 0;
+
+            const container = document.getElementById('shop-upgrades');
+            container.innerHTML = '';
+            UPGRADE_DEFS.forEach(def => {
+                const level = gameState.upgrades[def.key];
+                const cost = level < 5 ? UPGRADE_COSTS[level] : null;
+                const pips = '■'.repeat(level) + '□'.repeat(5 - level);
+                const row = document.createElement('div');
+                row.className = 'upgrade-row';
+                row.innerHTML = `<span class="upgrade-name">${def.label}</span>` +
+                    `<span class="upgrade-pips">${pips}</span>` +
+                    `<span class="upgrade-cost">${cost ? cost + 'cr' : 'MAX'}</span>`;
+                const btn = document.createElement('button');
+                btn.className = 'btn';
+                btn.textContent = 'BUY';
+                btn.disabled = !cost || gameState.credits < cost;
+                btn.addEventListener('click', () => buyUpgrade(def.key));
+                row.appendChild(btn);
+                container.appendChild(row);
+            });
+        }
+
+        // --- Death ---
+        document.getElementById('respawn-btn').addEventListener('click', respawn);
+
+        function die() {
+            gameState.dead = true;
+            spawnParticles(gameState.ship.x, gameState.ship.y, 20, '#58a6ff', 300);
+            const lost = gameState.ship.cargo.length;
+            gameState.ship.cargo = [];
+            let downgraded = '';
+            const upgradeable = Object.keys(gameState.upgrades).filter(k => gameState.upgrades[k] > 0);
+            if (upgradeable.length > 0) {
+                const key = upgradeable[Math.floor(Math.random() * upgradeable.length)];
+                gameState.upgrades[key]--;
+                downgraded = UPGRADE_DEFS.find(d => d.key === key).label;
+                applyUpgrades();
+            }
+            let msg = lost > 0 ? `Lost ${lost} cargo.` : 'No cargo lost.';
+            if (downgraded) msg += ` ${downgraded} downgraded.`;
+            document.getElementById('death-msg').textContent = msg;
+            document.getElementById('death-overlay').classList.add('visible');
+            saveGame();
+        }
+
+        function respawn() {
+            const ship = gameState.ship;
+            gameState.dead = false;
+            ship.x = 0; ship.y = 0;
+            ship.vx = 0; ship.vy = 0;
+            ship.hull = ship.maxHull;
+            ship.fuel = ship.maxFuel;
+            ship.invulnTimer = 3;
+            gameState.rocks = [];
+            document.getElementById('death-overlay').classList.remove('visible');
+            gameState.lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- Rock generation ---
+        function generateRockVertices(radius) {
+            const count = 7 + Math.floor(Math.random() * 5);
+            const verts = [];
+            for (let i = 0; i < count; i++) {
+                const angle = (i / count) * Math.PI * 2;
+                const dist = radius * (0.7 + Math.random() * 0.3);
+                verts.push({ angle, dist });
+            }
+            return verts;
+        }
+
+        function spawnRock(x, y, tier) {
+            const t = ROCK_TIERS[tier];
+            const distFromOrigin = Math.sqrt(x * x + y * y);
+            const driftScale = 1 + distFromOrigin / 3000;
+            const angle = Math.random() * Math.PI * 2;
+            const speed = ROCK_DRIFT_BASE * driftScale * (0.5 + Math.random());
+            gameState.rocks.push({
+                x, y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                rotation: Math.random() * Math.PI * 2,
+                rotSpeed: (Math.random() - 0.5) * 2,
+                tier, radius: t.radius, hp: t.hp,
+                vertices: generateRockVertices(t.radius)
+            });
+        }
+
+        function pickTier(dist) {
+            const r = Math.random();
+            if (dist > 3000) return r < 0.5 ? 'large' : r < 0.8 ? 'medium' : 'small';
+            if (dist > 1500) return r < 0.3 ? 'large' : r < 0.7 ? 'medium' : 'small';
+            if (dist > 500) return r < 0.1 ? 'large' : r < 0.4 ? 'medium' : 'small';
+            return r < 0.2 ? 'medium' : 'small';
+        }
+
+        function getTargetRockCount() {
+            const dist = Math.sqrt(gameState.ship.x ** 2 + gameState.ship.y ** 2);
+            return Math.min(ROCK_BASE_DENSITY + Math.floor(dist / 200), ROCK_MAX_COUNT);
+        }
+
+        // --- Particles ---
+        function spawnParticles(x, y, count, color, speed) {
+            for (let i = 0; i < count && gameState.particles.length < PARTICLE_MAX; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const spd = speed * (0.3 + Math.random() * 0.7);
+                gameState.particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * spd,
+                    vy: Math.sin(angle) * spd,
+                    life: 0.4 + Math.random() * 0.4,
+                    maxLife: 0.8,
+                    color, size: 2 + Math.random() * 2
+                });
+            }
+        }
+
+        // --- Resource drops ---
+        function pickResource(dist) {
+            const available = RESOURCE_TYPES.filter(r => dist >= r.minDist);
+            const weights = available.map((r, i) => Math.pow(0.5, available.length - 1 - i));
+            const total = weights.reduce((s, w) => s + w, 0);
+            let roll = Math.random() * total;
+            for (let i = 0; i < available.length; i++) {
+                roll -= weights[i];
+                if (roll <= 0) return available[i];
+            }
+            return available[0];
+        }
+
+        function dropResources(rock) {
+            const dist = Math.sqrt(rock.x * rock.x + rock.y * rock.y);
+            const count = rock.tier === 'large' ? 3 : rock.tier === 'medium' ? 2 : 1;
+            for (let i = 0; i < count; i++) {
+                const type = pickResource(dist);
+                const offset = 20;
+                gameState.resources.push({
+                    x: rock.x + (Math.random() - 0.5) * offset,
+                    y: rock.y + (Math.random() - 0.5) * offset,
+                    type: type.name, color: type.color, value: type.value,
+                    life: RESOURCE_LIFETIME,
+                    bobPhase: Math.random() * Math.PI * 2
+                });
+            }
+        }
+
+        // --- Auto-aim ---
+        function findNearestRock(range) {
+            const ship = gameState.ship;
+            let nearest = null, minDist = range;
+            for (const rock of gameState.rocks) {
+                const dx = rock.x - ship.x, dy = rock.y - ship.y;
+                const d = Math.sqrt(dx * dx + dy * dy);
+                if (d < minDist) { minDist = d; nearest = rock; }
+            }
+            return nearest;
+        }
+
+        // --- Update functions ---
         function updateShip(dt) {
             const ship = gameState.ship;
+            const derived = gameState.derived;
 
             if (gameState.isMobile && gameState.joystick.active) {
-                // Joystick: angle directly sets ship angle, force sets thrust
                 ship.angle = -gameState.joystick.angle + Math.PI / 2;
                 ship.thrust = gameState.joystick.force;
-            } else {
-                // Keyboard rotation
+            } else if (!gameState.isMobile) {
                 let rotating = 0;
                 if (gameState.keys['ArrowLeft'] || gameState.keys['KeyA']) rotating -= 1;
                 if (gameState.keys['ArrowRight'] || gameState.keys['KeyD']) rotating += 1;
-                ship.angle += rotating * SHIP_ROTATION_SPEED * dt;
-
-                // Keyboard thrust
+                ship.angle += rotating * 4.5 * dt;
+                ship.thrust = (gameState.keys['ArrowUp'] || gameState.keys['KeyW']) ? 1 : 0;
+            } else {
                 ship.thrust = 0;
-                if (gameState.keys['ArrowUp'] || gameState.keys['KeyW']) ship.thrust = 1;
             }
 
-            // Apply thrust
-            if (ship.thrust > 0) {
-                ship.vx += Math.cos(ship.angle) * SHIP_ACCEL * ship.thrust * dt;
-                ship.vy += Math.sin(ship.angle) * SHIP_ACCEL * ship.thrust * dt;
+            if (ship.thrust > 0 && ship.fuel > 0) {
+                ship.fuel -= FUEL_DRAIN_RATE * ship.thrust * dt;
+                if (ship.fuel < 0) ship.fuel = 0;
+                ship.vx += Math.cos(ship.angle) * derived.accel * ship.thrust * dt;
+                ship.vy += Math.sin(ship.angle) * derived.accel * ship.thrust * dt;
+                if (gameState.particles.length < PARTICLE_MAX && Math.random() < 0.6) {
+                    const bx = ship.x - Math.cos(ship.angle) * ship.size * 0.5;
+                    const by = ship.y - Math.sin(ship.angle) * ship.size * 0.5;
+                    gameState.particles.push({
+                        x: bx, y: by,
+                        vx: -Math.cos(ship.angle) * 80 + (Math.random() - 0.5) * 40,
+                        vy: -Math.sin(ship.angle) * 80 + (Math.random() - 0.5) * 40,
+                        life: 0.2 + Math.random() * 0.15, maxLife: 0.35,
+                        color: '#f0883e', size: 2
+                    });
+                }
+            } else if (ship.fuel <= 0) {
+                ship.thrust = 0;
             }
 
-            // Clamp speed
             const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
-            if (speed > SHIP_MAX_SPEED) {
-                ship.vx = (ship.vx / speed) * SHIP_MAX_SPEED;
-                ship.vy = (ship.vy / speed) * SHIP_MAX_SPEED;
+            if (speed > derived.maxSpeed) {
+                ship.vx = (ship.vx / speed) * derived.maxSpeed;
+                ship.vy = (ship.vy / speed) * derived.maxSpeed;
             }
 
-            // Drag
             ship.vx *= SHIP_DRAG;
             ship.vy *= SHIP_DRAG;
-
-            // Move
             ship.x += ship.vx * dt;
             ship.y += ship.vy * dt;
 
-            // Camera follows ship
             gameState.camera.x = ship.x;
             gameState.camera.y = ship.y;
+
+            if (ship.invulnTimer > 0) ship.invulnTimer -= dt;
+            if (gameState.cargoFullFlash > 0) gameState.cargoFullFlash -= dt;
         }
 
-        // --- Rendering ---
+        function updateShooting(dt) {
+            const ship = gameState.ship;
+            ship.fireTimer -= dt;
+
+            let shouldFire = false;
+            let fireAngle = ship.angle;
+
+            if (gameState.isMobile) {
+                const target = findNearestRock(AUTOAIM_RANGE);
+                if (target && (gameState.joystick.active || fireButtonDown)) {
+                    fireAngle = Math.atan2(target.y - ship.y, target.x - ship.x);
+                    shouldFire = true;
+                }
+                if (fireButtonDown && !target) {
+                    shouldFire = true;
+                    fireAngle = ship.angle;
+                }
+            } else {
+                if (gameState.mouse.down || gameState.keys['Space']) {
+                    shouldFire = true;
+                    if (gameState.mouse.down) {
+                        fireAngle = Math.atan2(
+                            gameState.mouse.y - canvas.height / 2,
+                            gameState.mouse.x - canvas.width / 2
+                        );
+                    } else {
+                        const target = findNearestRock(AUTOAIM_RANGE);
+                        if (target) fireAngle = Math.atan2(target.y - ship.y, target.x - ship.x);
+                    }
+                }
+            }
+
+            if (shouldFire && ship.fireTimer <= 0) {
+                ship.fireTimer = gameState.derived.fireRate;
+                gameState.bullets.push({
+                    x: ship.x + Math.cos(fireAngle) * ship.size,
+                    y: ship.y + Math.sin(fireAngle) * ship.size,
+                    vx: Math.cos(fireAngle) * BULLET_SPEED + ship.vx * 0.3,
+                    vy: Math.sin(fireAngle) * BULLET_SPEED + ship.vy * 0.3,
+                    life: BULLET_LIFETIME,
+                    angle: fireAngle
+                });
+            }
+        }
+
+        function updateBullets(dt) {
+            for (let i = gameState.bullets.length - 1; i >= 0; i--) {
+                const b = gameState.bullets[i];
+                b.x += b.vx * dt;
+                b.y += b.vy * dt;
+                b.life -= dt;
+                if (b.life <= 0) gameState.bullets.splice(i, 1);
+            }
+        }
+
+        function updateRocks(dt) {
+            const ship = gameState.ship;
+
+            for (let i = gameState.rocks.length - 1; i >= 0; i--) {
+                const rock = gameState.rocks[i];
+                rock.x += rock.vx * dt;
+                rock.y += rock.vy * dt;
+                rock.rotation += rock.rotSpeed * dt;
+
+                const dx = rock.x - ship.x, dy = rock.y - ship.y;
+                if (dx * dx + dy * dy > ROCK_DESPAWN_RADIUS * ROCK_DESPAWN_RADIUS) {
+                    gameState.rocks.splice(i, 1);
+                }
+            }
+
+            const target = getTargetRockCount();
+            let attempts = 0;
+            while (gameState.rocks.length < target && attempts < 5) {
+                attempts++;
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 800 + Math.random() * 400;
+                const sx = ship.x + Math.cos(angle) * dist;
+                const sy = ship.y + Math.sin(angle) * dist;
+                const distToBase = Math.sqrt(sx * sx + sy * sy);
+                if (distToBase < BASE_SAFE_RADIUS) continue;
+                const distFromOrigin = Math.sqrt(sx * sx + sy * sy);
+                spawnRock(sx, sy, pickTier(distFromOrigin));
+            }
+        }
+
+        function updateParticles(dt) {
+            for (let i = gameState.particles.length - 1; i >= 0; i--) {
+                const p = gameState.particles[i];
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.life -= dt;
+                if (p.life <= 0) gameState.particles.splice(i, 1);
+            }
+        }
+
+        function updateResources(dt) {
+            const ship = gameState.ship;
+            for (let i = gameState.resources.length - 1; i >= 0; i--) {
+                const r = gameState.resources[i];
+                r.life -= dt;
+                r.bobPhase += dt * 3;
+
+                const dx = r.x - ship.x, dy = r.y - ship.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (r.life <= 0 || dx * dx + dy * dy > ROCK_DESPAWN_RADIUS * ROCK_DESPAWN_RADIUS) {
+                    gameState.resources.splice(i, 1);
+                    continue;
+                }
+
+                if (dist < RESOURCE_COLLECT_RADIUS) {
+                    if (ship.cargo.length < ship.maxCargo) {
+                        ship.cargo.push({ type: r.type, value: r.value });
+                        spawnParticles(r.x, r.y, 4, r.color, 60);
+                        gameState.resources.splice(i, 1);
+                    } else {
+                        gameState.cargoFullFlash = 1;
+                    }
+                }
+            }
+        }
+
+        function checkCollisions() {
+            const ship = gameState.ship;
+
+            // Bullets vs rocks
+            for (let bi = gameState.bullets.length - 1; bi >= 0; bi--) {
+                const b = gameState.bullets[bi];
+                for (let ri = gameState.rocks.length - 1; ri >= 0; ri--) {
+                    const rock = gameState.rocks[ri];
+                    const dx = b.x - rock.x, dy = b.y - rock.y;
+                    if (dx * dx + dy * dy < rock.radius * rock.radius) {
+                        gameState.bullets.splice(bi, 1);
+                        rock.hp--;
+                        spawnParticles(b.x, b.y, 3, '#8b949e', 80);
+                        if (rock.hp <= 0) {
+                            const tier = ROCK_TIERS[rock.tier];
+                            spawnParticles(rock.x, rock.y, 10, '#8b949e', 150);
+                            dropResources(rock);
+                            if (tier.children > 0) {
+                                for (let c = 0; c < tier.children; c++) {
+                                    spawnRock(
+                                        rock.x + (Math.random() - 0.5) * 20,
+                                        rock.y + (Math.random() - 0.5) * 20,
+                                        tier.childTier
+                                    );
+                                }
+                            }
+                            gameState.rocks.splice(ri, 1);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // Ship vs rocks
+            if (ship.invulnTimer <= 0) {
+                for (const rock of gameState.rocks) {
+                    const dx = ship.x - rock.x, dy = ship.y - rock.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < rock.radius + ship.size * 0.6) {
+                        ship.hull -= COLLISION_DAMAGE;
+                        ship.invulnTimer = INVULN_TIME;
+                        const angle = Math.atan2(dy, dx);
+                        ship.vx += Math.cos(angle) * 200;
+                        ship.vy += Math.sin(angle) * 200;
+                        spawnParticles(ship.x, ship.y, 8, '#f85149', 120);
+                        if (ship.hull <= 0) { die(); return; }
+                        break;
+                    }
+                }
+            }
+        }
+
+        function checkDocking() {
+            const ship = gameState.ship;
+            const base = gameState.base;
+            const dx = ship.x - base.x, dy = ship.y - base.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
+
+            if (dist < base.radius && speed < BASE_DOCK_SPEED && !gameState.docked && !gameState.shopOpen) {
+                gameState.docked = true;
+                ship.fuel = ship.maxFuel;
+                ship.hull = ship.maxHull;
+                openShop();
+            }
+            if (dist > base.radius * 2) {
+                gameState.docked = false;
+            }
+        }
+
+        // --- Drawing ---
         function drawStars() {
             const cam = gameState.camera;
             for (const star of gameState.stars) {
                 const parallax = star.layer;
                 let sx = (star.x - cam.x * parallax) % STAR_FIELD_SIZE;
                 let sy = (star.y - cam.y * parallax) % STAR_FIELD_SIZE;
-
-                // Wrap stars
-                const hw = canvas.width / 2;
-                const hh = canvas.height / 2;
+                const hw = canvas.width / 2, hh = canvas.height / 2;
                 if (sx < -hw) sx += STAR_FIELD_SIZE;
                 if (sx > hw) sx -= STAR_FIELD_SIZE;
                 if (sy < -hh) sy += STAR_FIELD_SIZE;
                 if (sy > hh) sy -= STAR_FIELD_SIZE;
-
-                const screenX = sx + hw;
-                const screenY = sy + hh;
-
+                const screenX = sx + hw, screenY = sy + hh;
                 if (screenX >= 0 && screenX <= canvas.width && screenY >= 0 && screenY <= canvas.height) {
-                    ctx.fillStyle = `rgba(255, 255, 255, ${star.brightness})`;
+                    ctx.fillStyle = `rgba(255,255,255,${star.brightness})`;
                     ctx.fillRect(screenX, screenY, star.size, star.size);
                 }
             }
         }
 
+        function drawBase() {
+            const base = gameState.base;
+            const sx = base.x - gameState.camera.x + canvas.width / 2;
+            const sy = base.y - gameState.camera.y + canvas.height / 2;
+            if (sx < -100 || sx > canvas.width + 100 || sy < -100 || sy > canvas.height + 100) return;
+
+            gameState.base.pulse += 0.02;
+            const pulse = 0.5 + Math.sin(gameState.base.pulse) * 0.3;
+
+            ctx.beginPath();
+            ctx.arc(sx, sy, base.radius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(63,185,80,${pulse * 0.4})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const a = (i / 6) * Math.PI * 2 + gameState.base.pulse * 0.3;
+                const method = i === 0 ? 'moveTo' : 'lineTo';
+                ctx[method](sx + Math.cos(a) * 25, sy + Math.sin(a) * 25);
+            }
+            ctx.closePath();
+            ctx.strokeStyle = '#3fb950';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const a = (i / 6) * Math.PI * 2 + gameState.base.pulse * 0.3;
+                ctx.moveTo(sx + Math.cos(a) * 12, sy + Math.sin(a) * 12);
+                ctx.lineTo(sx + Math.cos(a) * 25, sy + Math.sin(a) * 25);
+            }
+            ctx.strokeStyle = '#3fb950';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        function drawRocks() {
+            const cam = gameState.camera;
+            for (const rock of gameState.rocks) {
+                const sx = rock.x - cam.x + canvas.width / 2;
+                const sy = rock.y - cam.y + canvas.height / 2;
+                if (sx < -60 || sx > canvas.width + 60 || sy < -60 || sy > canvas.height + 60) continue;
+
+                ctx.save();
+                ctx.translate(sx, sy);
+                ctx.rotate(rock.rotation);
+                ctx.beginPath();
+                for (let i = 0; i < rock.vertices.length; i++) {
+                    const v = rock.vertices[i];
+                    const method = i === 0 ? 'moveTo' : 'lineTo';
+                    ctx[method](Math.cos(v.angle) * v.dist, Math.sin(v.angle) * v.dist);
+                }
+                ctx.closePath();
+                ctx.strokeStyle = '#8b949e';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        function drawBullets() {
+            ctx.strokeStyle = '#f85149';
+            ctx.lineWidth = 2;
+            for (const b of gameState.bullets) {
+                const sx = b.x - gameState.camera.x + canvas.width / 2;
+                const sy = b.y - gameState.camera.y + canvas.height / 2;
+                ctx.beginPath();
+                ctx.moveTo(sx, sy);
+                ctx.lineTo(sx - Math.cos(b.angle) * BULLET_LENGTH, sy - Math.sin(b.angle) * BULLET_LENGTH);
+                ctx.stroke();
+            }
+        }
+
+        function drawResources() {
+            const cam = gameState.camera;
+            for (const r of gameState.resources) {
+                const sx = r.x - cam.x + canvas.width / 2;
+                const sy = r.y - cam.y + canvas.height / 2 + Math.sin(r.bobPhase) * 3;
+                if (sx < -20 || sx > canvas.width + 20 || sy < -20 || sy > canvas.height + 20) continue;
+
+                const alpha = r.life < 5 ? r.life / 5 : 1;
+                ctx.save();
+                ctx.translate(sx, sy);
+                ctx.rotate(r.bobPhase * 0.5);
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const a = (i / 6) * Math.PI * 2;
+                    const method = i === 0 ? 'moveTo' : 'lineTo';
+                    ctx[method](Math.cos(a) * 6, Math.sin(a) * 6);
+                }
+                ctx.closePath();
+                ctx.strokeStyle = r.color.replace(')', `,${alpha})`).replace('rgb', 'rgba').replace('#', '');
+                ctx.strokeStyle = r.color;
+                ctx.globalAlpha = alpha;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+                ctx.restore();
+            }
+        }
+
+        function drawParticles() {
+            for (const p of gameState.particles) {
+                const sx = p.x - gameState.camera.x + canvas.width / 2;
+                const sy = p.y - gameState.camera.y + canvas.height / 2;
+                const alpha = p.life / p.maxLife;
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(sx - p.size / 2, sy - p.size / 2, p.size, p.size);
+            }
+            ctx.globalAlpha = 1;
+        }
+
         function drawShip() {
             const ship = gameState.ship;
+            if (ship.invulnTimer > 0 && Math.floor(ship.invulnTimer * 10) % 2 === 0) return;
+
             const screenX = canvas.width / 2;
             const screenY = canvas.height / 2;
 
@@ -465,7 +1082,6 @@
             ctx.translate(screenX, screenY);
             ctx.rotate(ship.angle);
 
-            // Ship body (triangle)
             ctx.beginPath();
             ctx.moveTo(ship.size, 0);
             ctx.lineTo(-ship.size * 0.7, -ship.size * 0.6);
@@ -476,8 +1092,7 @@
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Thrust flame
-            if (ship.thrust > 0) {
+            if (ship.thrust > 0 && ship.fuel > 0) {
                 const flameSize = ship.size * 0.5 * (0.7 + Math.random() * 0.3);
                 ctx.beginPath();
                 ctx.moveTo(-ship.size * 0.4, -ship.size * 0.2);
@@ -494,46 +1109,76 @@
         function drawHUD() {
             const ship = gameState.ship;
             const dist = Math.sqrt(ship.x * ship.x + ship.y * ship.y);
+            const vel = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
 
-            ctx.font = '14px Courier New';
-            ctx.fillStyle = '#8b949e';
+            ctx.font = '13px Courier New';
             ctx.textAlign = 'left';
-            ctx.fillText(`DIST: ${Math.floor(dist)}`, 16, 30);
-            ctx.fillText(`VEL: ${Math.floor(Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy))}`, 16, 50);
+            let y = 24;
 
-            // Home direction indicator
-            if (dist > 50) {
+            ctx.fillStyle = '#8b949e';
+            ctx.fillText(`DIST: ${Math.floor(dist)}`, 14, y); y += 18;
+            ctx.fillText(`VEL: ${Math.floor(vel)}`, 14, y); y += 18;
+
+            const fuelPct = ship.fuel / ship.maxFuel;
+            ctx.fillStyle = fuelPct < 0.2 ? '#f85149' : '#8b949e';
+            const fuelBars = Math.ceil(fuelPct * 10);
+            ctx.fillText(`FUEL: ${'|'.repeat(fuelBars)}${'-'.repeat(10 - fuelBars)} ${Math.floor(ship.fuel)}`, 14, y); y += 18;
+
+            const hullPct = ship.hull / ship.maxHull;
+            ctx.fillStyle = hullPct <= 0.34 ? '#f85149' : '#8b949e';
+            ctx.fillText(`HULL: ${'█'.repeat(ship.hull)}${'░'.repeat(ship.maxHull - ship.hull)}`, 14, y); y += 18;
+
+            ctx.fillStyle = '#8b949e';
+            ctx.fillText(`CARGO: ${ship.cargo.length}/${ship.maxCargo}`, 14, y); y += 18;
+            ctx.fillText(`CR: ${gameState.credits}`, 14, y);
+
+            if (gameState.cargoFullFlash > 0) {
+                ctx.fillStyle = '#f85149';
+                ctx.font = '16px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText('CARGO FULL', canvas.width / 2, canvas.height - 40);
+            }
+
+            // Home indicator
+            if (dist > 100) {
                 const homeAngle = Math.atan2(-ship.y, -ship.x);
                 const indicatorDist = 60;
                 const ix = canvas.width / 2 + Math.cos(homeAngle) * indicatorDist;
                 const iy = canvas.height / 2 + Math.sin(homeAngle) * indicatorDist;
-
                 ctx.beginPath();
                 ctx.arc(ix, iy, 4, 0, Math.PI * 2);
                 ctx.fillStyle = '#3fb950';
                 ctx.fill();
-
                 ctx.font = '10px Courier New';
-                ctx.fillStyle = '#3fb950';
                 ctx.textAlign = 'center';
                 ctx.fillText('HOME', ix, iy + 14);
             }
         }
 
-        // --- Game loop ---
+        // --- Game Loop ---
         function gameLoop(timestamp) {
-            if (gameState.paused) return;
+            if (gameState.paused || gameState.shopOpen || gameState.dead) return;
 
             const dt = Math.min((timestamp - gameState.lastTime) / 1000, 0.05);
             gameState.lastTime = timestamp;
 
-            // Update
             updateShip(dt);
+            updateShooting(dt);
+            updateBullets(dt);
+            updateRocks(dt);
+            updateParticles(dt);
+            updateResources(dt);
+            checkCollisions();
+            if (!gameState.dead) checkDocking();
 
-            // Render
             ctx.fillStyle = '#0d1117';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             drawStars();
+            drawBase();
+            drawResources();
+            drawRocks();
+            drawBullets();
+            drawParticles();
             drawShip();
             drawHUD();
 
@@ -542,11 +1187,15 @@
 
         // --- Start ---
         try { detectMobile(); } catch(e) { console.warn('Mobile init failed:', e); }
+        loadGame();
+        applyUpgrades();
+        gameState.ship.hull = gameState.ship.maxHull;
+        gameState.ship.fuel = gameState.ship.maxFuel;
 
-        // Render first frame synchronously so the ship is visible immediately
         ctx.fillStyle = '#0d1117';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         drawStars();
+        drawBase();
         drawShip();
         drawHUD();
 
