@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0d1117">
     <title>Asteroids Miner</title>
     <style>
         * {
@@ -16,6 +20,9 @@
             overflow: hidden;
             background: #0d1117;
             touch-action: none;
+            position: fixed;
+            top: 0;
+            left: 0;
         }
         canvas {
             display: block;
@@ -695,7 +702,7 @@
             const derived = gameState.derived;
 
             if (gameState.isMobile && gameState.joystick.active) {
-                ship.angle = -gameState.joystick.angle + Math.PI / 2;
+                ship.angle = -gameState.joystick.angle;
                 ship.thrust = gameState.joystick.force;
             } else if (!gameState.isMobile) {
                 let rotating = 0;
