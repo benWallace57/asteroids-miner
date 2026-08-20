@@ -29,7 +29,7 @@
             width: 100%;
             height: 100%;
         }
-        #pause-overlay, #shop-overlay, #death-overlay {
+        #pause-overlay, #shop-overlay, #death-overlay, #rescue-overlay {
             display: none;
             position: fixed;
             top: 0;
@@ -45,10 +45,10 @@
             overflow-y: auto;
             padding: 20px;
         }
-        #pause-overlay.visible, #shop-overlay.visible, #death-overlay.visible {
+        #pause-overlay.visible, #shop-overlay.visible, #death-overlay.visible, #rescue-overlay.visible {
             display: flex;
         }
-        #pause-overlay h1, #shop-overlay h1, #death-overlay h1 {
+        #pause-overlay h1, #shop-overlay h1, #death-overlay h1, #rescue-overlay h1 {
             font-family: 'Courier New', monospace;
             color: #58a6ff;
             font-size: 2.5rem;
@@ -56,7 +56,8 @@
             text-transform: uppercase;
         }
         #death-overlay h1 { color: #f85149; }
-        #pause-overlay p, #shop-overlay p, #death-overlay p {
+        #rescue-overlay h1 { color: #f0883e; }
+        #pause-overlay p, #shop-overlay p, #death-overlay p, #rescue-overlay p {
             font-family: 'Courier New', monospace;
             color: #8b949e;
             font-size: 1rem;
@@ -230,6 +231,11 @@
         <p id="death-msg">Cargo lost. Hull downgraded.</p>
         <button class="btn" id="respawn-btn">RESPAWN</button>
     </div>
+    <div id="rescue-overlay">
+        <h1>OUT OF FUEL</h1>
+        <p id="rescue-msg">Cargo dumped. Rescue fee: 5 CR.</p>
+        <button class="btn" id="rescue-btn">RESCUE ME</button>
+    </div>
     <div id="rotate-overlay">
         <span>&#x21BB;</span>
         <p>Rotate to landscape</p>
@@ -338,7 +344,10 @@
             derived: { maxSpeed: SHIP_MAX_SPEED, fireRate: FIRE_RATE_BASE, accel: SHIP_ACCEL },
             settings: { joystickSide: 'left', joystickMode: 'static' },
             docked: true,
-            cargoFullFlash: 0
+            cargoFullFlash: 0,
+            stranded: false,
+            rescued: false,
+            rescueTug: null
         };
 
         function applyUpgrades() {
@@ -490,7 +499,7 @@
         fireBtn.addEventListener('touchend', () => { fireButtonDown = false; });
 
         function togglePause() {
-            if (gameState.shopOpen || gameState.dead) return;
+            if (gameState.shopOpen || gameState.dead || gameState.stranded || gameState.rescued) return;
             gameState.paused = !gameState.paused;
             document.getElementById('pause-overlay').classList.toggle('visible', gameState.paused);
             if (!gameState.paused) {
@@ -505,6 +514,7 @@
             gameState.docked = true;
             ship.fuel = ship.maxFuel;
             ship.hull = ship.maxHull;
+            ship.invulnTimer = 0;
             ship.vx = 0; ship.vy = 0;
             document.getElementById('dock-button').classList.remove('visible');
             openShop();
@@ -618,6 +628,94 @@
             document.getElementById('death-overlay').classList.remove('visible');
             gameState.lastTime = performance.now();
             requestAnimationFrame(gameLoop);
+        }
+
+        // --- Rescue (out of fuel) ---
+        document.getElementById('rescue-btn').addEventListener('click', startRescue);
+
+        function triggerRescue() {
+            gameState.stranded = true;
+            const ship = gameState.ship;
+            const cargoCount = ship.cargo.length;
+            ship.cargo = [];
+            const fee = gameState.credits < 5 ? gameState.credits : Math.max(5, Math.floor(gameState.credits * 0.25));
+            gameState.credits -= fee;
+            let msg = cargoCount > 0 ? `${cargoCount} cargo dumped for tow.` : 'No cargo to dump.';
+            msg += fee > 0 ? ` Rescue fee: ${fee} CR.` : '';
+            document.getElementById('rescue-msg').textContent = msg;
+            document.getElementById('rescue-overlay').classList.add('visible');
+            saveGame();
+        }
+
+        function startRescue() {
+            document.getElementById('rescue-overlay').classList.remove('visible');
+            gameState.stranded = false;
+            gameState.rescued = true;
+            const ship = gameState.ship;
+            const angleToBase = Math.atan2(-ship.y, -ship.x);
+            const approachAngle = angleToBase + Math.PI;
+            gameState.rescueTug = {
+                x: ship.x + Math.cos(approachAngle) * 400,
+                y: ship.y + Math.sin(approachAngle) * 400,
+                angle: angleToBase,
+                attached: false
+            };
+            gameState.lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function updateRescue(dt) {
+            const ship = gameState.ship;
+            const tug = gameState.rescueTug;
+            if (!tug) return;
+
+            if (!tug.attached) {
+                const dx = ship.x - tug.x;
+                const dy = ship.y - tug.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                tug.angle = Math.atan2(dy, dx);
+                if (dist < 30) {
+                    tug.attached = true;
+                } else {
+                    const speed = 300;
+                    tug.x += Math.cos(tug.angle) * speed * dt;
+                    tug.y += Math.sin(tug.angle) * speed * dt;
+                }
+            } else {
+                const dx = -tug.x;
+                const dy = -tug.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 50) {
+                    completeRescue();
+                    return;
+                }
+                const angle = Math.atan2(dy, dx);
+                tug.angle = angle;
+                const speed = 500;
+                tug.x += Math.cos(angle) * speed * dt;
+                tug.y += Math.sin(angle) * speed * dt;
+                ship.x = tug.x - Math.cos(angle) * 40;
+                ship.y = tug.y - Math.sin(angle) * 40;
+                ship.angle = angle;
+                ship.vx = 0; ship.vy = 0;
+            }
+            gameState.camera.x = ship.x;
+            gameState.camera.y = ship.y;
+        }
+
+        function completeRescue() {
+            const ship = gameState.ship;
+            ship.x = 0; ship.y = 0;
+            ship.vx = 0; ship.vy = 0;
+            ship.fuel = ship.maxFuel;
+            ship.hull = ship.maxHull;
+            ship.invulnTimer = 3;
+            gameState.rescued = false;
+            gameState.rescueTug = null;
+            gameState.rocks = [];
+            gameState.camera.x = 0;
+            gameState.camera.y = 0;
+            saveGame();
         }
 
         // --- Rock generation ---
@@ -761,9 +859,14 @@
                 }
             } else if (ship.fuel <= 0) {
                 ship.thrust = 0;
+                ship.invulnTimer = Infinity;
             }
 
             const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
+            if (ship.fuel <= 0 && speed < 5 && !gameState.stranded && !gameState.dead && !gameState.docked) {
+                triggerRescue();
+                return;
+            }
             if (speed > derived.maxSpeed) {
                 ship.vx = (ship.vx / speed) * derived.maxSpeed;
                 ship.vy = (ship.vy / speed) * derived.maxSpeed;
@@ -1106,9 +1209,46 @@
             ctx.globalAlpha = 1;
         }
 
+        function drawTug() {
+            const tug = gameState.rescueTug;
+            if (!tug) return;
+            const ship = gameState.ship;
+            const cam = gameState.camera;
+            const sx = (tug.x - cam.x) + canvas.width / 2;
+            const sy = (tug.y - cam.y) + canvas.height / 2;
+            const size = SHIP_SIZE * 0.6;
+
+            ctx.save();
+            ctx.translate(sx, sy);
+            ctx.rotate(tug.angle);
+            ctx.beginPath();
+            ctx.moveTo(size, 0);
+            ctx.lineTo(-size * 0.7, -size * 0.6);
+            ctx.lineTo(-size * 0.4, 0);
+            ctx.lineTo(-size * 0.7, size * 0.6);
+            ctx.closePath();
+            ctx.strokeStyle = '#e3b341';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+
+            if (tug.attached) {
+                const shipSx = canvas.width / 2;
+                const shipSy = canvas.height / 2;
+                ctx.beginPath();
+                ctx.setLineDash([6, 4]);
+                ctx.moveTo(sx, sy);
+                ctx.lineTo(shipSx, shipSy);
+                ctx.strokeStyle = '#e3b341';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+
         function drawShip() {
             const ship = gameState.ship;
-            if (ship.invulnTimer > 0 && Math.floor(ship.invulnTimer * 10) % 2 === 0) return;
+            if (ship.invulnTimer > 0 && ship.invulnTimer !== Infinity && Math.floor(ship.invulnTimer * 10) % 2 === 0) return;
 
             const screenX = canvas.width / 2;
             const screenY = canvas.height / 2;
@@ -1192,28 +1332,36 @@
 
         // --- Game Loop ---
         function gameLoop(timestamp) {
-            if (gameState.paused || gameState.shopOpen || gameState.dead) return;
+            if (gameState.paused || gameState.shopOpen || gameState.dead || gameState.stranded) return;
 
             const dt = Math.min((timestamp - gameState.lastTime) / 1000, 0.05);
             gameState.lastTime = timestamp;
 
-            updateShip(dt);
-            updateShooting(dt);
-            updateBullets(dt);
-            updateRocks(dt);
-            updateParticles(dt);
-            updateResources(dt);
-            checkCollisions();
-            if (!gameState.dead) checkDocking();
+            if (gameState.rescued) {
+                updateRescue(dt);
+                updateParticles(dt);
+            } else {
+                updateShip(dt);
+                updateShooting(dt);
+                updateBullets(dt);
+                updateRocks(dt);
+                updateParticles(dt);
+                updateResources(dt);
+                checkCollisions();
+                if (!gameState.dead) checkDocking();
+            }
 
             ctx.fillStyle = '#0d1117';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             drawStars();
             drawBase();
-            drawResources();
-            drawRocks();
-            drawBullets();
+            if (!gameState.rescued) {
+                drawResources();
+                drawRocks();
+                drawBullets();
+            }
             drawParticles();
+            if (gameState.rescued) drawTug();
             drawShip();
             drawHUD();
 
