@@ -1290,6 +1290,11 @@
             ctx.textAlign = 'left';
             let y = 24;
 
+            ctx.fillStyle = '#484f58';
+            ctx.textAlign = 'right';
+            ctx.fillText('v0.5', canvas.width - 14, 24);
+            ctx.textAlign = 'left';
+
             ctx.fillStyle = '#8b949e';
             ctx.fillText(`DIST: ${Math.floor(dist)}`, 14, y); y += 18;
             ctx.fillText(`VEL: ${Math.floor(vel)}`, 14, y); y += 18;
