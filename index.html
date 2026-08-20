@@ -119,6 +119,8 @@
             font-weight: bold;
             z-index: 50;
             cursor: pointer;
+            align-items: center;
+            justify-content: center;
         }
         #dock-button {
             display: none;
@@ -217,6 +219,7 @@
             </div>
         </div>
         <button class="btn" id="resume-btn">Resume</button>
+        <button class="btn" id="cheat-btn" style="margin-top:20px;border-color:#3fb950;color:#3fb950;font-size:0.7rem">$$$ CHEAT $$$</button>
     </div>
     <div id="shop-overlay">
         <h1>Home Base</h1>
@@ -307,7 +310,9 @@
             { key: 'cargo',    label: 'CARGO',     desc: '+4 slots' },
             { key: 'speed',    label: 'SPEED',     desc: '+50 max' },
             { key: 'fireRate', label: 'FIRE RATE', desc: 'faster' },
-            { key: 'thrust',   label: 'THRUST',    desc: '+100 accel' }
+            { key: 'thrust',   label: 'THRUST',    desc: '+100 accel' },
+            { key: 'scanner',  label: 'SCANNER',   desc: 'better drops' },
+            { key: 'density',  label: 'DENSITY',   desc: 'more rocks' }
         ];
 
         // --- Game State ---
@@ -340,7 +345,7 @@
             isMobile: false,
             lastTime: 0,
             credits: 0,
-            upgrades: { hull: 0, fuel: 0, cargo: 0, speed: 0, fireRate: 0, thrust: 0 },
+            upgrades: { hull: 0, fuel: 0, cargo: 0, speed: 0, fireRate: 0, thrust: 0, scanner: 0, density: 0 },
             derived: { maxSpeed: SHIP_MAX_SPEED, fireRate: FIRE_RATE_BASE, accel: SHIP_ACCEL },
             settings: { joystickSide: 'left', joystickMode: 'static' },
             docked: true,
@@ -482,6 +487,10 @@
 
         document.getElementById('pause-button').addEventListener('click', togglePause);
         document.getElementById('resume-btn').addEventListener('click', togglePause);
+        document.getElementById('cheat-btn').addEventListener('click', function() {
+            gameState.credits += 99999;
+            saveGame();
+        });
         document.getElementById('joystick-side-btns').addEventListener('click', function(e) {
             if (!e.target.dataset.value) return;
             gameState.settings.joystickSide = e.target.dataset.value;
@@ -757,7 +766,8 @@
 
         function getTargetRockCount() {
             const dist = Math.sqrt(gameState.ship.x ** 2 + gameState.ship.y ** 2);
-            return Math.min(ROCK_BASE_DENSITY + Math.floor(dist / 200), ROCK_MAX_COUNT);
+            const densityBonus = gameState.upgrades.density * 3;
+            return Math.min(ROCK_BASE_DENSITY + densityBonus + Math.floor(dist / 200), ROCK_MAX_COUNT + densityBonus);
         }
 
         // --- Particles ---
@@ -778,15 +788,18 @@
 
         // --- Resource drops ---
         function pickResource(dist) {
-            const available = RESOURCE_TYPES.filter(r => dist >= r.minDist);
-            const weights = available.map((r, i) => Math.pow(0.5, available.length - 1 - i));
+            const scannerLevel = gameState.upgrades.scanner;
+            const effectiveDist = dist + scannerLevel * 600;
+            const available = RESOURCE_TYPES.filter(r => effectiveDist >= r.minDist);
+            const bias = 1 + scannerLevel * 0.3;
+            const weights = available.map((r, i) => Math.pow(bias, i));
             const total = weights.reduce((s, w) => s + w, 0);
             let roll = Math.random() * total;
             for (let i = 0; i < available.length; i++) {
                 roll -= weights[i];
                 if (roll <= 0) return available[i];
             }
-            return available[0];
+            return available[available.length - 1];
         }
 
         function dropResources(rock) {
@@ -1292,7 +1305,7 @@
 
             ctx.fillStyle = '#484f58';
             ctx.textAlign = 'right';
-            ctx.fillText('v0.5', canvas.width - 14, 24);
+            ctx.fillText('v0.6', canvas.width - 14, 24);
             ctx.textAlign = 'left';
 
             ctx.fillStyle = '#8b949e';
