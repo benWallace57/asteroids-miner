@@ -87,7 +87,7 @@
             position: fixed;
             top: 16px;
             right: 16px;
-            z-index: 50;
+            z-index: 60;
             width: 44px;
             height: 44px;
             background: transparent;
@@ -114,10 +114,10 @@
         #aim-zone {
             display: none;
             position: fixed;
+            top: 70px;
             bottom: 0;
             right: 0;
             width: 50%;
-            height: 100%;
             z-index: 50;
         }
         #dock-button {
@@ -2433,6 +2433,12 @@
         }, { once: true });
 
         // --- Start ---
+        window.gameState = gameState;
+        window.sellCargo = sellCargo;
+        window.buyUpgrade = buyUpgrade;
+        window.buyBaseUpgrade = buyBaseUpgrade;
+        window.gameLoop = gameLoop;
+        window.QUESTS = QUESTS;
         try { detectMobile(); } catch(e) { console.warn('Mobile init failed:', e); }
         loadGame();
         applyUpgrades();
