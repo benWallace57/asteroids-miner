@@ -29,7 +29,7 @@
             width: 100%;
             height: 100%;
         }
-        #pause-overlay, #shop-overlay, #death-overlay, #rescue-overlay {
+        #pause-overlay, #shop-overlay, #death-overlay, #rescue-overlay, #transmissions-overlay {
             display: none;
             position: fixed;
             top: 0;
@@ -50,10 +50,31 @@
             padding-top: 60px;
             gap: 10px;
         }
-        #pause-overlay.visible, #shop-overlay.visible, #death-overlay.visible, #rescue-overlay.visible {
+        #transmissions-overlay {
+            justify-content: flex-start;
+            padding-top: 60px;
+            gap: 8px;
+        }
+        #transmissions-log {
+            width: 100%;
+            max-width: 500px;
+            max-height: 60vh;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            text-align: left;
+        }
+        .transmission-entry {
+            border-left: 2px solid #3fb950;
+            padding: 6px 10px;
+            margin-bottom: 8px;
+        }
+        .transmission-entry .from { color: #58a6ff; margin-bottom: 2px; }
+        .transmission-entry .msg { color: #3fb950; opacity: 0.9; }
+        #pause-overlay.visible, #shop-overlay.visible, #death-overlay.visible, #rescue-overlay.visible, #transmissions-overlay.visible {
             display: flex;
         }
-        #pause-overlay h1, #shop-overlay h1, #death-overlay h1, #rescue-overlay h1 {
+        #pause-overlay h1, #shop-overlay h1, #death-overlay h1, #rescue-overlay h1, #transmissions-overlay h1 {
             font-family: 'Courier New', monospace;
             color: #58a6ff;
             font-size: 2.5rem;
@@ -123,9 +144,9 @@
         #dock-button {
             display: none;
             position: fixed;
-            bottom: 50%;
+            bottom: 80px;
             left: 50%;
-            transform: translate(-50%, 50%);
+            transform: translateX(-50%);
             z-index: 60;
             font-size: 1.2rem;
             padding: 12px 32px;
@@ -217,8 +238,14 @@
             </div>
         </div>
         <button class="btn" id="resume-btn">Resume</button>
-        <button class="btn" id="cheat-btn" style="margin-top:20px;border-color:#3fb950;color:#3fb950;font-size:0.7rem">$$$ CHEAT $$$</button>
+        <button class="btn" id="transmissions-btn" style="margin-top:20px;border-color:#3fb950;color:#3fb950;font-size:0.7rem">TRANSMISSIONS</button>
+        <button class="btn" id="cheat-btn" style="margin-top:8px;border-color:#3fb950;color:#3fb950;font-size:0.7rem">$$$ CHEAT $$$</button>
         <button class="btn" id="reset-btn" style="margin-top:8px;border-color:#f85149;color:#f85149;font-size:0.7rem">RESET SAVE</button>
+    </div>
+    <div id="transmissions-overlay">
+        <h1>Transmissions</h1>
+        <div id="transmissions-log"></div>
+        <button class="btn" id="transmissions-back-btn">BACK</button>
     </div>
     <div id="shop-overlay">
         <h1>Home Base</h1>
@@ -363,7 +390,7 @@
             { id: 'q_copper_3', name: 'Copper Rush', desc: 'Collect 3 copper', type: 'collect', resource: 'copper', target: 3, reward: 25 },
             { id: 'q_kill_5', name: 'Pest Control', desc: 'Destroy 5 hostiles', type: 'kill', target: 5, reward: 50 },
             { id: 'q_gold_5', name: 'Gold Fever', desc: 'Collect 5 gold', type: 'collect', resource: 'gold', target: 5, reward: 60 },
-            { id: 'q_dist_3000', name: 'Deep Space', desc: 'Reach distance 3000', type: 'distance', target: 3000, reward: 80 },
+            { id: 'q_dist_5000', name: 'Deep Space', desc: 'Reach distance 5000', type: 'distance', target: 5000, reward: 80 },
             { id: 'q_kill_20', name: 'Enforcer', desc: 'Destroy 20 hostiles', type: 'kill', target: 20, reward: 100 },
             { id: 'q_crystal_3', name: 'Crystal Clear', desc: 'Collect 3 crystal', type: 'collect', resource: 'crystal', target: 3, reward: 120 },
         ];
@@ -534,6 +561,10 @@
                 q.progress = 0;
                 checkTransmissions('quest_complete');
                 saveGame();
+                // Auto-check distance quests in case already past target
+                if (q.current < QUESTS.length && QUESTS[q.current].type === 'distance') {
+                    advanceQuest('distance');
+                }
             }
         }
 
@@ -655,6 +686,29 @@
                 localStorage.removeItem('asteroids-save');
                 location.reload();
             }
+        });
+        document.getElementById('transmissions-btn').addEventListener('click', function() {
+            document.getElementById('pause-overlay').classList.remove('visible');
+            const log = document.getElementById('transmissions-log');
+            log.innerHTML = '';
+            const seen = gameState.story.seen;
+            if (seen.length === 0) {
+                log.innerHTML = '<p style="color:#8b949e;text-align:center">No transmissions received yet.</p>';
+            } else {
+                for (const id of seen) {
+                    const t = TRANSMISSIONS.find(tr => tr.id === id);
+                    if (!t) continue;
+                    const entry = document.createElement('div');
+                    entry.className = 'transmission-entry';
+                    entry.innerHTML = `<div class="from">[${t.from}]</div><div class="msg">${t.text}</div>`;
+                    log.appendChild(entry);
+                }
+            }
+            document.getElementById('transmissions-overlay').classList.add('visible');
+        });
+        document.getElementById('transmissions-back-btn').addEventListener('click', function() {
+            document.getElementById('transmissions-overlay').classList.remove('visible');
+            document.getElementById('pause-overlay').classList.add('visible');
         });
         document.getElementById('joystick-side-btns').addEventListener('click', function(e) {
             if (!e.target.dataset.value) return;
@@ -1459,6 +1513,9 @@
                         if (!gameState.rocks.includes(e.attachedTo)) {
                             gameState.enemies.splice(i, 1);
                             spawnParticles(e.x, e.y, 6, '#f85149', 100);
+                            gameState.story.stats.enemiesKilled++;
+                            checkTransmissions('enemy_kill');
+                            advanceQuest('kill');
                             continue;
                         }
                         e.x = e.attachedTo.x;
@@ -2337,40 +2394,48 @@
                 const t = gameState.story.active;
                 const visibleText = t.text.substring(0, Math.floor(t.charIndex));
                 const tx = canvas.width / 2;
-                const ty = canvas.height - 90;
                 const maxW = Math.min(400, canvas.width - 40);
 
                 ctx.save();
                 ctx.font = '11px Courier New';
                 ctx.textAlign = 'center';
 
-                // Border box
-                ctx.strokeStyle = '#3fb950';
-                ctx.lineWidth = 1;
-                ctx.globalAlpha = 0.6 + Math.sin(Date.now() * 0.005) * 0.2;
-                ctx.strokeRect(tx - maxW/2 - 10, ty - 28, maxW + 20, 55);
-                ctx.globalAlpha = 1;
-
-                // From line
-                ctx.fillStyle = '#58a6ff';
-                ctx.fillText(`[${t.from}]`, tx, ty - 12);
-
-                // Message body (wrap)
-                ctx.fillStyle = '#3fb950';
-                ctx.globalAlpha = 0.9;
+                // Pre-calculate wrapped lines for box sizing
                 const words = visibleText.split(' ');
-                let line = '', lineY = ty + 4;
+                const lines = [];
+                let line = '';
                 for (const word of words) {
                     const test = line + word + ' ';
                     if (ctx.measureText(test).width > maxW) {
-                        ctx.fillText(line.trim(), tx, lineY);
+                        lines.push(line.trim());
                         line = word + ' ';
-                        lineY += 14;
                     } else {
                         line = test;
                     }
                 }
-                if (line.trim()) ctx.fillText(line.trim(), tx, lineY);
+                if (line.trim()) lines.push(line.trim());
+
+                const lineHeight = 14;
+                const boxH = 28 + lines.length * lineHeight + 12;
+                const ty = canvas.height - 30 - boxH;
+
+                // Border box
+                ctx.strokeStyle = '#3fb950';
+                ctx.lineWidth = 1;
+                ctx.globalAlpha = 0.6 + Math.sin(Date.now() * 0.005) * 0.2;
+                ctx.strokeRect(tx - maxW/2 - 10, ty, maxW + 20, boxH);
+                ctx.globalAlpha = 1;
+
+                // From line
+                ctx.fillStyle = '#58a6ff';
+                ctx.fillText(`[${t.from}]`, tx, ty + 16);
+
+                // Message body
+                ctx.fillStyle = '#3fb950';
+                ctx.globalAlpha = 0.9;
+                for (let li = 0; li < lines.length; li++) {
+                    ctx.fillText(lines[li], tx, ty + 32 + li * lineHeight);
+                }
                 ctx.globalAlpha = 1;
                 ctx.restore();
             }
