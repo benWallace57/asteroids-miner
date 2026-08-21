@@ -42,6 +42,51 @@ async function run() {
   await desktopPage.waitForTimeout(300);
   await desktopPage.screenshot({ path: `${SCREENSHOT_DIR}/desktop-paused.png` });
   console.log('Screenshot saved: tests/screenshots/desktop-paused.png');
+
+  // Bug test: pause button overlapping quest HUD
+  await desktopPage.keyboard.press('Escape'); // unpause
+  await desktopPage.waitForTimeout(100);
+  await desktopPage.evaluate(() => {
+    gameState.questTracks.mining.unlocked = true;
+    gameState.questTracks.exploration.unlocked = true;
+    gameState.questTracks.combat.unlocked = true;
+    gameState.questTracks.story.unlocked = true;
+  });
+  await desktopPage.waitForTimeout(200);
+  await desktopPage.screenshot({ path: `${SCREENSHOT_DIR}/quest-hud-overlap.png` });
+  console.log('Screenshot saved: tests/screenshots/quest-hud-overlap.png');
+
+  // Bug test: distance quest after prestige
+  // Simulate post-prestige state: maxDist is high but quests are reset
+  const distQuestResult = await desktopPage.evaluate(() => {
+    // Simulate prestige: high maxDist from previous run, but quests reset
+    gameState.story.stats.maxDist = 20000;
+    gameState.questTracks.exploration.unlocked = true;
+    gameState.questTracks.exploration.current = 0; // "First Steps: reach 800"
+    gameState.questTracks.exploration.progress = 0;
+    // Place ship at 1000m (past the 800m target)
+    gameState.ship.x = 1000; gameState.ship.y = 0;
+    gameState.camera.x = 1000; gameState.camera.y = 0;
+    // Run one game frame — does the quest advance via normal updateShip path?
+    gameState.paused = false;
+    gameState.lastTime = performance.now() - 16;
+    gameLoop(performance.now());
+    return {
+      shipDist: Math.round(Math.sqrt(gameState.ship.x**2 + gameState.ship.y**2)),
+      maxDist: gameState.story.stats.maxDist,
+      questProgress: gameState.questTracks.exploration.progress,
+      questCurrent: gameState.questTracks.exploration.current,
+      questTarget: QUEST_TRACKS.exploration.quests[0].target
+    };
+  });
+  console.log('\n--- Bug test: Distance quest after prestige ---');
+  console.log(`  Ship at: ${distQuestResult.shipDist}m (past target of ${distQuestResult.questTarget}m)`);
+  console.log(`  maxDist (from prev run): ${distQuestResult.maxDist}m`);
+  console.log(`  Quest advanced via normal game loop: ${distQuestResult.questCurrent > 0 ? 'YES ✓' : 'NO ❌ (bug)'}`);
+
+  await desktopPage.waitForTimeout(200);
+  await desktopPage.screenshot({ path: `${SCREENSHOT_DIR}/bug-distance-quest-prestige.png` });
+  console.log('Screenshot saved: tests/screenshots/bug-distance-quest-prestige.png');
   await desktopPage.close();
 
   // Mobile test

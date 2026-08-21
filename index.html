@@ -152,6 +152,24 @@
             padding: 12px 32px;
         }
         #dock-button.visible { display: block; }
+        #dash-button {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 55;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: transparent;
+            border: 2px solid #58a6ff;
+            color: #58a6ff;
+            font: bold 11px Courier New;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+        #dash-button.visible { display: flex; align-items: center; justify-content: center; }
+        #dash-button.cooldown { border-color: #484f58; color: #484f58; opacity: 0.4; }
         #rotate-overlay {
             display: none;
             position: fixed;
@@ -274,6 +292,7 @@
         <p>Rotate to landscape</p>
     </div>
     <button id="dock-button" class="btn btn-sell">DOCK</button>
+    <button id="dash-button">DASH</button>
     <div id="joystick-zone"></div>
     <div id="aim-zone"></div>
     <button id="fire-button">FIRE</button>
@@ -543,7 +562,8 @@
             tripStats: { kills: {}, maxDist: 0, startHull: 3 },
             questFlash: 0,
             prestige: 0,
-            shipColor: '#58a6ff'
+            shipColor: '#58a6ff',
+            dashPressed: false
         };
 
         function getSafeRadius() {
@@ -925,6 +945,11 @@
             openShop();
         });
 
+        // --- Dash button ---
+        document.getElementById('dash-button').addEventListener('click', function() {
+            gameState.dashPressed = true;
+        });
+
         // --- Shop ---
         document.getElementById('sell-btn').addEventListener('click', sellCargo);
         document.getElementById('undock-btn').addEventListener('click', closeShop);
@@ -1090,18 +1115,35 @@
             const breakdown = document.getElementById('cargo-breakdown');
             breakdown.innerHTML = '';
             if (ship.cargo.length > 0) {
+                const refineryBonus = gameState.baseUpgrades.refinery * 0.2;
                 const counts = {};
                 ship.cargo.forEach(item => {
-                    if (!counts[item.type]) counts[item.type] = { count: 0, value: 0 };
+                    if (!counts[item.type]) counts[item.type] = { count: 0, value: 0, baseValue: 0 };
                     counts[item.type].count++;
-                    counts[item.type].value += Math.round(item.value * bonus);
+                    let mult = bonus;
+                    if ((item.type === 'platinum' || item.type === 'crystal') && refineryBonus > 0) mult += refineryBonus;
+                    counts[item.type].value += Math.round(item.value * mult);
+                    counts[item.type].baseValue += item.value;
                 });
                 for (const [type, data] of Object.entries(counts)) {
                     const res = RESOURCE_TYPES.find(r => r.name === type);
+                    const bonusAmt = data.value - data.baseValue;
+                    const bonusStr = bonusAmt > 0 ? ` <span style="color:#3fb950">(+${bonusAmt})</span>` : '';
                     const line = document.createElement('div');
                     line.style.cssText = 'display:flex;justify-content:space-between;padding:2px 0';
-                    line.innerHTML = `<span style="color:${res ? res.color : '#8b949e'}">● ${type}</span><span style="color:#8b949e">×${data.count} = ${data.value}cr</span>`;
+                    line.innerHTML = `<span style="color:${res ? res.color : '#8b949e'}">● ${type}</span><span style="color:#8b949e">×${data.count} = ${data.value}cr${bonusStr}</span>`;
                     breakdown.appendChild(line);
+                }
+                // Show active bonuses
+                const bonusParts = [];
+                if (gameState.baseUpgrades.sellBonus > 0) bonusParts.push(`Trade +${Math.round(gameState.baseUpgrades.sellBonus * 15)}%`);
+                if (refineryBonus > 0) bonusParts.push(`Refinery +${Math.round(refineryBonus * 100)}% plat/crystal`);
+                if (gameState.prestige > 0) bonusParts.push(`Prestige +${gameState.prestige * 10}%`);
+                if (bonusParts.length > 0) {
+                    const bonusLine = document.createElement('div');
+                    bonusLine.style.cssText = 'color:#3fb950;font-size:9px;padding-top:4px;text-align:right';
+                    bonusLine.textContent = bonusParts.join(' | ');
+                    breakdown.appendChild(bonusLine);
                 }
             }
 
@@ -1474,12 +1516,14 @@
 
             // Dash ability
             if (ship.dashCooldown > 0) ship.dashCooldown -= dt;
-            if (derived.dashCooldown > 0 && gameState.keys['ShiftLeft'] && ship.dashCooldown <= 0 && ship.thrust > 0 && ship.fuel > 0) {
+            const dashInput = gameState.keys['ShiftLeft'] || gameState.keys['ShiftRight'] || gameState.dashPressed;
+            if (derived.dashCooldown > 0 && dashInput && ship.dashCooldown <= 0 && ship.fuel >= 5) {
                 ship.vx += Math.cos(ship.angle) * 600;
                 ship.vy += Math.sin(ship.angle) * 600;
                 ship.dashCooldown = derived.dashCooldown;
                 ship.fuel -= 5;
                 spawnParticles(ship.x, ship.y, 8, '#58a6ff', 100);
+                gameState.dashPressed = false;
             }
 
             const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
@@ -1510,9 +1554,9 @@
             if (currentDist > gameState.story.stats.maxDist) {
                 gameState.story.stats.maxDist = currentDist;
                 checkTransmissions('distance');
-                advanceQuest('distance');
                 checkQuestUnlocks();
             }
+            advanceQuest('distance');
             updateTransmission(dt);
         }
 
@@ -1608,6 +1652,8 @@
                     const distToBase = Math.sqrt(rock.x * rock.x + rock.y * rock.y);
                     if (distToBase < getSafeRadius() * 0.8) {
                         spawnParticles(rock.x, rock.y, 6, rock.resourceType.color, 100);
+                        if (!gameState.defenseLasers) gameState.defenseLasers = [];
+                        gameState.defenseLasers.push({ x: rock.x, y: rock.y, timer: 0.3 });
                         dropResources(rock);
                         gameState.rocks.splice(i, 1);
                     }
@@ -1641,6 +1687,12 @@
                 p.y += p.vy * dt;
                 p.life -= dt;
                 if (p.life <= 0) gameState.particles.splice(i, 1);
+            }
+            if (gameState.defenseLasers) {
+                for (let i = gameState.defenseLasers.length - 1; i >= 0; i--) {
+                    gameState.defenseLasers[i].timer -= dt;
+                    if (gameState.defenseLasers[i].timer <= 0) gameState.defenseLasers.splice(i, 1);
+                }
             }
         }
 
@@ -1765,6 +1817,16 @@
             if (dist > base.radius * 2.5) {
                 gameState.docked = false;
             }
+
+            // Dash button visibility
+            const dashBtn = document.getElementById('dash-button');
+            if (gameState.upgrades.dash > 0 && !gameState.shopOpen && !gameState.paused && !gameState.dead) {
+                dashBtn.classList.add('visible');
+                dashBtn.classList.toggle('cooldown', ship.dashCooldown > 0);
+                dashBtn.textContent = ship.dashCooldown > 0 ? Math.ceil(ship.dashCooldown) + 's' : 'DASH';
+            } else {
+                dashBtn.classList.remove('visible');
+            }
         }
 
         // --- Enemies ---
@@ -1805,6 +1867,8 @@
                     const distToBase = Math.sqrt(e.x * e.x + e.y * e.y);
                     if (distToBase < getSafeRadius() * 0.8) {
                         spawnParticles(e.x, e.y, 8, '#f85149', 120);
+                        if (!gameState.defenseLasers) gameState.defenseLasers = [];
+                        gameState.defenseLasers.push({ x: e.x, y: e.y, timer: 0.3 });
                         gameState.enemies.splice(i, 1);
                         recordKill(e.type);
                         continue;
@@ -2192,6 +2256,36 @@
                     ctx.setLineDash([3, 3]);
                     ctx.stroke();
                     ctx.setLineDash([]);
+                }
+            }
+
+            // Beacon safe zone ring
+            if (bu.beacon > 0) {
+                const safeR = getSafeRadius();
+                const screenR = safeR;
+                ctx.beginPath();
+                ctx.arc(sx, sy, screenR, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(63,185,80,${0.12 + Math.sin(t * 0.5) * 0.05})`;
+                ctx.lineWidth = 1;
+                ctx.setLineDash([8, 8]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // Defense lasers
+            if (gameState.defenseLasers && gameState.defenseLasers.length > 0) {
+                const cam = gameState.camera;
+                for (const laser of gameState.defenseLasers) {
+                    const lx = laser.x - cam.x + canvas.width / 2;
+                    const ly = laser.y - cam.y + canvas.height / 2;
+                    ctx.globalAlpha = laser.timer / 0.3;
+                    ctx.strokeStyle = '#f85149';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(sx, sy);
+                    ctx.lineTo(lx, ly);
+                    ctx.stroke();
+                    ctx.globalAlpha = 1;
                 }
             }
         }
@@ -2684,6 +2778,19 @@
                 ctx.stroke();
             }
 
+            // Shield ring when invulnerable
+            if (ship.invulnTimer > 0 && ship.invulnTimer !== Infinity && gameState.upgrades.shield > 0) {
+                ctx.rotate(-ship.angle);
+                const shieldAlpha = 0.3 + Math.sin(Date.now() * 0.01) * 0.2;
+                ctx.globalAlpha = shieldAlpha;
+                ctx.strokeStyle = '#7ee8fa';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(0, 0, ship.size * 1.3, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+
             ctx.restore();
         }
 
@@ -2698,7 +2805,7 @@
 
             ctx.fillStyle = '#484f58';
             ctx.textAlign = 'right';
-            ctx.fillText('v2.0', canvas.width - 14, 24);
+            ctx.fillText('v2.0', canvas.width - 64, 24);
             ctx.textAlign = 'left';
 
             ctx.fillStyle = '#8b949e';
@@ -2834,10 +2941,10 @@
             }
             ctx.restore();
 
-            // Quest HUD - show all active tracks
+            // Quest HUD - show all active tracks (below pause button which ends at y~60)
             ctx.textAlign = 'right';
             const qx = canvas.width - 14;
-            let qy = 44;
+            let qy = 74;
             for (const [trackId, track] of Object.entries(QUEST_TRACKS)) {
                 const qt = gameState.questTracks[trackId];
                 if (!qt.unlocked || qt.current >= track.quests.length) continue;
@@ -2978,6 +3085,7 @@
         window.buyUpgrade = buyUpgrade;
         window.buyBaseUpgrade = buyBaseUpgrade;
         window.gameLoop = gameLoop;
+        window.advanceQuest = advanceQuest;
         window.QUEST_TRACKS = QUEST_TRACKS;
         try { detectMobile(); } catch(e) { console.warn('Mobile init failed:', e); }
         loadGame();
